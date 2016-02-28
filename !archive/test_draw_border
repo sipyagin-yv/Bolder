@@ -1,0 +1,38 @@
+;
+proc            TEST_DRAW_BORDER
+                ; quad-color
+                mov     edi, [scr.mem]
+                mov     eax, 0ffffffh
+                mov     ecx, 640 * (28*8/4)
+                rep     stosd
+                mov     eax, 00000ffh
+                mov     ecx, 640 * (28*8/4)
+                rep     stosd
+                mov     eax, 000ff00h
+                mov     ecx, 640 * (28*8/4)
+                rep     stosd
+                mov     eax, 0ff0000h
+                mov     ecx, 640 * (28*8/4)
+                rep     stosd
+                ; border width 2
+                mov     edi, [scr.mem]
+                mov     eax, 000ffffh
+                mov     ecx, 640*2
+                rep stosd
+                ;
+                mov     edx, 28*8 - 4
+.L1:            mov     ecx, 2
+                rep stosd
+;                mov     ecx, 640-4
+;                mov     eax, 00000ffh
+;                rep stosd
+                add     edi, (640-4)*4
+                mov     ecx, 2
+                rep stosd
+                dec     edx
+                jnz     .L1
+                ;
+                mov     ecx, 640*2
+                rep     stosd
+                ret
+endp

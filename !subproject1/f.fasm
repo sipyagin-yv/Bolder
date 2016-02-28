@@ -1,0 +1,48 @@
+                FORMAT  PE GUI
+                stack   8192
+                include "win32wx.inc"
+                include 'encoding\win1251.inc'
+
+section '.const' readable
+
+data1           dd      100
+data2           dd      200
+
+section '.code2' readable executable
+
+start:          
+                mov     eax, [data1]
+                mov     ebx, [data2]
+
+                stdcall p1, eax, ebx
+
+                call    main
+
+                ret
+
+proc            main
+                local   d1:DWORD
+                local   d2:DWORD
+                ;
+                mov     [d1], 50
+                mov     [d2], 60
+
+                stdcall p1, [d1], [d2]
+
+                xor     eax, eax
+                ret
+endp
+
+proc            p1      uses eax ebx, p1:DWORD, p2:DWORD
+                local   r:RECT
+                ;
+                mov     eax, [p1]
+                mov     ebx, [p2]
+                add     eax, ebx
+                shl     eax, 2
+                ;
+                invoke  GetClientRect, 0, addr r
+                ret
+endp
+
+                .end    start

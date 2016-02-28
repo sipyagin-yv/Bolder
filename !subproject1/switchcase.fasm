@@ -1,0 +1,20 @@
+﻿struc           case    code, addr
+{
+ .keycode       rb      code
+ .keyaddr       rd      addr
+}
+
+                ; esi = table of switch
+                ; al = code
+proc            SWITCH
+ .L0:           cmp     byte [esi + SWENTRY.keycode], 0
+                je      .L1
+                cmp     al, [esi + SWENTRY.keycode]
+                je      .L2
+                add     esi, sizeof.SWENTRY
+                jmp     .L0
+ .L2:           jmp     dword [esi + SWENTRY.keyaddr]
+ .L1:           lea     esi, [esi + SWENTRY.keyaddr]
+                jmp     esi
+endp
+

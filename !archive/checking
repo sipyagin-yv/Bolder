@@ -1,0 +1,43 @@
+﻿;                call    CreateMainWindow
+;                stdcall CreateScreen, 80, 28
+;                ;
+;                call    MainLoop
+;                ;
+;                call    DeleteImage
+;                call    DeleteMainWindow
+
+;                .const
+;errexample:     du      'BOLDER: Can''t load resource file "bolder.bin".',13,10
+;                du      '[OpenError throw exception "The system cannot find the file specified"].', 0
+;
+;err_main        du      'Can''t load resource file "bolder.bin"', 0
+;err_action      du      'Read file', 0
+;err_size        du      'Readed size not equal requested size', 0
+;err_lasterror   =       2
+
+;                .code
+;proc            checkErrorMessages
+;                ; error.action / error.lasterror|error.user
+;
+;                CLEARERROR                              ; error.action = 0
+;                stdcall HaltOnError, err_main           ; error.lasterror, error.user = 0
+;
+;                invoke  SetLastError, 2                 ; error.action = err_action
+;                SYSTEMERROR     err_action              ; error.lasterror = 2
+;                stdcall HaltOnError, err_main
+;
+;                USERERROR       err_action, err_size    ; error.action = err_action
+;                stdcall HaltOnError, err_main           ; error.user = err_size
+;
+;                USERERROR       , err_size              ; error.action = 0
+;                stdcall HaltOnError, err_main           ; error.user = err_main
+;
+;                mov     [error.lasterror], 0            ; error.action = err_action
+;                mov     [error.user], 0                 ; error.lasterror, error.user = 0
+;                mov     [error.action], err_action
+;                stdcall HaltOnError, err_main
+;
+;                invoke  ExitProcess, 0
+;                ;;;;;;;;
+;                ret
+;endp

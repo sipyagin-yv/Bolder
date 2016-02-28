@@ -1,0 +1,30 @@
+                FORMAT  PE CONSOLE
+                include 'WIN32WX.INC'
+                repeat  2
+current_pass    =       %
+
+                section '.code' readable executable
+start:          xor     eax, eax
+                ret
+
+                ; Ќ≈Ћ№«я, чтобы секции имели нулевой размер
+                ; (по€витс€ сообщение "невозможно запустить приложение")
+
+if current_pass = 1
+                section '.data' readable writeable
+data_offset     =       $
+                ;
+                ;
+data_size       =       data_offset-$
+
+else if current_pass = 2
+        if data_size = 0
+                display 'section .data is empty'
+        else
+                section '.data' readable writeable
+        end if
+end if
+
+                end repeat
+
+                .end    start

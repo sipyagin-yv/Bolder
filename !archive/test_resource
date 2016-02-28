@@ -1,0 +1,64 @@
+﻿                .data
+res1            db      'resource#1'
+res1new         db      'res#4'
+res2            db      'resource#2'
+res3            db      'resource#3'
+resX            db      'resource#X'
+                align   16
+_res            db      10000 dup(0ffh)
+                
+
+
+                stdcall crc32InitTable
+
+                mov     edi, _res
+                mov     eax, 3
+                call    InitResMan
+                
+                ; вставляем новый ресурс
+                mov     edi, 0
+                mov     esi, res1
+                mov     ecx, 10
+                call    ReplaceResource
+                mov     edi, 1
+                mov     esi, res2
+                mov     ecx, 10
+                call    ReplaceResource
+                mov     edi, 2
+                mov     esi, res3
+                mov     ecx, 10
+                call    ReplaceResource
+
+                ; заменяем ресурс (новый размер, меньший)
+                mov     edi, 1
+                mov     esi, res1new
+                mov     ecx, 5
+                call    ReplaceResource
+
+                ; заменяем ресурс (тот же размер)
+                mov     edi, 0
+                mov     esi, resX
+                mov     ecx, 10
+                call    ReplaceResource
+
+                ; убираем ресурс
+                mov     edi, 1
+                mov     esi, 0
+                mov     ecx, 0
+                call    ReplaceResource
+
+                ; убираем остальные ресурсы
+                mov     edi, 0
+                mov     esi, 0
+                mov     ecx, 0
+                call    ReplaceResource
+                mov     edi, 2
+                mov     esi, 0
+                mov     ecx, 0
+                call    ReplaceResource
+
+                ; пытаемся изменить несуществующий ресурс
+                mov     edi, 4
+                call    ReplaceResource
+
+        

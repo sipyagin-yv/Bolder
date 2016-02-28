@@ -1,0 +1,64 @@
+﻿
+
+
+
+
+
+                ; si = адрес ресурса, следующего после заменяемого
+                ; di = адрес, указывающий на последний байт всего ресурсного файла
+                ; cx = new_size - old_size
+                
+
+
+;;                mov     bx,[resaddr]
+;;                cmp     di,[bx]
+;;                jae     .Done
+;;                push    si cx
+;;                call    GetResourcePtr
+;;                sub     cx,[si]       ; cx = new_size - old_size
+;;                push    si
+;;                mov     di,[bx+2]       ; temp1 = resource_size
+;;                add     [bx+2],cx       ; resource_size = resource_size + cx
+;;                dec     di              
+;;                add     di,bx           ; di = temp1 - 1 resource_area, di указывает на последний байт ресурсов
+;;                lodsw                   ; 
+;;                add     si,ax           ; si = resource_ptr + sizeof.resource, 
+;;                call    MoveBlock       ;      si указывает на следующий ресурс (после заменяемого) 
+;;                pop     si
+;;                mov     di,si
+;;                pop     cx si           ; Исходный блок
+;;                mov     ax,cx
+;;                stosw
+;;                rep     movsb
+;;                mov     [reschanged],TRUE
+;; .Done:         call    ReindexResource
+;;                pop     di si cx bx ax
+;;                ret
+;;                popad
+;;                ret
+;;endp
+
+
+;;                ; Сдвиг блока [SI .. DI] на CX байт
+;;MoveBlock:      push    ax cx si di
+;;                jcxz    .Done
+;;                mov     ax,cx
+;;                mov     cx,di
+;;                sub     cx,si
+;;                inc     cx
+;;                or      ax,ax
+;;                jg      .MoveForward
+;; .MoveBackward: mov     di,si
+;;                add     di,ax
+;;                cld
+;;                rep     movsb
+;;                jmp     .Done
+;; .MoveForward:  mov     si,di
+;;                add     di,ax
+;;                std
+;;                rep     movsb
+;;                cld
+;; .Done:         pop     di si cx ax
+;;                ret
+;;
+

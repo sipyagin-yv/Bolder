@@ -1,0 +1,50 @@
+                format  pe console
+                include "win32wx.inc"
+                
+                ;include "macros.inc"
+                repeat  5
+current_section =       %
+                     if current_section = 2
+                        section '.code' code readable executable
+                        db      16 dup(0cch)
+                else if current_section = 3
+                        section '.data' data readable writeable
+                        db      16 dup(0cch)
+                else if current_section = 4
+                        section '.udata' data readable writeable
+                        db      16 dup(?)
+                else if current_section = 5
+                        section '.const' data readable
+                        db      16 dup(0cch)
+                end if
+                if current_section=2
+
+;                include "test1.inc"
+                ; Эта часть выполняется 4 раза!
+
+                xor     eax, eax ; в какую секцию попадёт? - .flat
+
+struct          stru1
+        r1      rb      1
+        r2      rb      1
+ends
+
+                end if                  ; Закрываем предыдущую секцию
+                if current_section = 3  ; Начинаем новую секцию .data
+
+data1           stru1
+
+                end if                  ; Закрываем предыдущую секцию
+                if current_section = 2  ; Начинаем новую секцию .code
+
+start:          mov     [data1.r1], 1
+                mov     [data1.r2], 2 
+                ret
+
+                end if
+
+                ; Завершение цикла по секциям
+                end repeat
+
+                ; Завершение текста программы и определение импортируемых процедур
+                .end    start

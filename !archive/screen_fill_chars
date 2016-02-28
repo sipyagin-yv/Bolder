@@ -1,0 +1,16 @@
+;
+;
+                mov     ecx, 0  ; char
+                mov     esi, 0  ; y
+ .loopY:        mov     edi, 0  ; x
+ .loopX:        stdcall DrawChar, edi, esi, ecx, 0ff0000h
+                inc     ecx
+                cmp     ecx, 128
+                jb      .L5
+                mov     ecx, 0
+        .L5:    inc     edi
+                cmp     edi, [scr.chars.x]
+                jb      .loopX
+                inc     esi
+                cmp     esi, [scr.chars.y]
+                jb      .loopY

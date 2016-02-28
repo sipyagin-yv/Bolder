@@ -1,0 +1,2944 @@
+                FORMAT  PE GUI
+                stack   8192
+                include "win32wx.inc"
+                include "macros.inc"
+                include "utils.inc"
+                include "windows.inc"
+                include "strings.inc"
+                include "errors.inc"
+                include "crc32.inc"
+                include "keys.inc"
+                include "bits.inc"
+
+                ; Win32-version specific constants
+CHAR_WIDTH      =       8
+CHAR_HEIGHT     =       14
+SCREEN_WIDTH    =       80
+SCREEN_HEIGHT   =       28
+                ;
+DELAY           =       55
+EDIT_CURSOR_DELAY =     2               ; Задержка в циклах DELAY
+SLIDE_DELAY     =       1               ; Задержка в циклах DELAY
+
+                ; Program constants
+RESOURCE_AREA_SIZE =    100000          ; Максимальный размер ресурсного файла
+MAX_LEVELS      =       50+50+50+50     ; Максимальное количество уровней
+MAX_RESOURCES   =       500             ; Максимальное количество ресурсов
+REC_AREA_SIZE   =       4096            ; Область данных для записи прохождения уровня
+MAZE_WIDTH      =       16              ; Ширина лабиринта
+MAZE_HEIGHT     =       12              ; Высота лабиринта
+DEMOFAST        =       FALSE
+
+SCORE_TREASURE  =       1               ; Очки за каждую драгоценность
+SCORE_BONUS     =       100             ; Очки за пройденный лабиринт
+BLACK_SCREEN    =       -1              ; Код черного экрана
+MAZE_SCREEN     =       -2              ; Код экрана лабиринта
+
+INIT_LIVES      =       5               ; Начальные попытки
+INIT_SCORE      =       0               ; Начальные очки
+
+GAME_LEVEL_DONE =       0
+GAME_PLAY_BREAK =       1
+GAME_LEVEL_BREAK=       2
+GAME_PLAYER_DIE =       3
+
+MODE_MENU       =       0               ; Режим меню
+MODE_PLAY       =       1               ; Режим игры (от начала до конца)
+MODE_VIEW       =       2               ; Режим просмотра лабиринтов
+MODE_VIDA       =       3               ; Режим просмотра лабиринтов (есть демо)
+MODE_EDIT       =       4               ; Режим редактирования лабиринта
+MODE_TEST       =       5               ; Тестовая игра (только текущ.лабиринт)
+MODE_DEMO       =       6               ; Демонстрационная игра
+
+_XY             =       -1              ; Перемещение курсора ( _XY, <x>|_MEM|_IGN, <y>|_MEM|_IGN )
+_ATTR           =       -2              ; Установка атрибут текста ( _ATTR, <attr> )
+_SUBSTR         =       -3              ; Показать подстроку ( _SUBS, <index> )
+_END            =       0               ; Конец текста ( _END )
+_MEM            =       -3              ; Для команды _XY, извлечь координату из ячейки памяти
+_IGN            =       -4              ; Для команды _XY, не изменять соответствующую координату
+
+;=== CONST ====================================================================
+                .const
+                ; Константы для win32 версии
+ProgramName             du      'BOLDER', 0
+MainWindowClassName     du      'BolderDash_wnd', 0
+MainWindowTitle         du      'Bolder Dash 3.2', 0
+
+                ; Сообщения об ошибках
+ErrorCreateMainClass    du      'Can''t register window class', 0
+ErrorCreateMainWindow   du      'Can''t create window', 0
+ErrorCreateImageDC      du      'Can''t create image (DC)', 0
+ErrorCreateImageDIB     du      'Can''t create image (DIB)', 0
+ErrorReadNotEqRequested du      'Readed bytes not equal requested bytes', 0
+ErrorWritedNotEqRequested du    'Write bytes not equal requested bytes', 0
+ErrorResourceTooBig     du      'Size of resource is too big to load', 0
+                        ;
+ActionCreateFile        du      'Create file', 0
+ActionRegisterClass     du      'Register class', 0
+ActionCreateWindow      du      'Create window', 0
+ActionCreateCompDC      du      'Create compatible DC', 0
+ActionCreateDIBSect     du      'Create DIB section', 0
+ActionOpenFile          du      'Open file', 0
+ActionCloseHandle       du      'Close file', 0
+ActionGetFileSize       du      'Get file size', 0
+ActionCheckSize         du      'Check file size', 0
+ActionReadFile          du      'Read file', 0
+ActionWriteFile         du      'Write file', 0
+                ;
+editorsave_question:
+                du      'Try to save levels file ?', 13, 10
+                du      'Please, select YES to try to save levels file again, '
+                du      'or select NO to continue', 0
+                ;
+exitsave_question:
+                du      'Try to save levels file ?', 13, 10
+                du      'Please, select YES to try to save levels file again, '
+                du      'or select NO to exit without saving, '
+                du      'or select CANCEL to continue gaming', 0
+                ;
+load_question:  du      'Try to load levels file ?', 13, 10
+                du      'Please, select YES to try to load levels file again, '
+                du      'or select NO to exit from game, '
+                du      'or select CANCEL to use original levels', 0
+                ;
+crc_question:   du      'Levels loaded, but CRC is wrong... Use original levels ?', 13, 10
+                du      'Please, select YES to use original levels, '
+                du      'or select NO to exit from game', 0
+
+struct          ResourceMainHeader
+magic           rd      1                       ; must be "BLDR"
+count           rd      1                       ; count of resources
+size            rd      1                       ; size of resources
+crc             rd      1                       ; crc32 of resources (exclude crc32)
+ends
+
+struct          ResourceDataHeader
+size            rw      1
+ends
+
+ResourceFile    du      'bolder.bin', 0
+ResourceOriginal file   'resources\bolder.original.bin'
+
+                ; Original error messages
+LevCRCErrMsg    du      'Resource file "bolder.bin" is corrupted', 0
+LevLoadErrMsg   du      'Can''t load resource file "bolder.bin"', 0
+LevSaveErrMsg   du      'Failed to save resource file "bolder.bin"', 0
+
+                ; "Партнерский" шрифт
+fontdata        file    'fnt8x8.bin'
+
+                ; DOS-цвета текстового режима
+macro           RGBA    red,green,blue
+{
+                DD      ((red AND 0ffh) SHL 16) OR ((green AND 0ffh) SHL 8) OR (blue AND 0ffh)
+}
+                ; Цвет фона
+defaultpalitre: RGBA    000,000,000             ; #00: black
+                RGBA    000,000,128             ; #01: blue
+                RGBA    000,128,000             ; #02: green
+                RGBA    000,128,128             ; #03: cyan
+                RGBA    128,000,000             ; #04: red
+                RGBA    128,000,128             ; #05: magenta
+                RGBA    128,128,000             ; #06: brown
+                RGBA    192,192,192             ; #07: light gray
+                RGBA    128,128,128             ; #08: dark gray
+                RGBA    000,000,255             ; #09: light blue
+                RGBA    000,255,000             ; #10: light green
+                RGBA    000,255,255             ; #11: light cyan
+                RGBA    255,000,000             ; #12: light red
+                RGBA    255,000,255             ; #13: light magenta
+                RGBA    255,255,000             ; #14: yellow
+                RGBA    255,255,255             ; #15: white
+
+                ; Таблица спрайтов, 94 штуки по 9 байт
+                ; 1-й байт - цвет, остальные 8 - сам спрайт
+SPRT:           DB      07h, 20h,20h,20h,20h,20h,20h,20h,20h;00       - пустота                      
+                DB      0Fh, 16h,17h,17h,10h,02h,03h,03h,20h;01       - камень (падают, прибивают)   
+                DB      0Bh, 2Fh,2Ah,5Ch,20h,5Ch,2Ah,2Fh,20h;02       - алмаз (падают, прибивают)    
+                DB      07h, 3Ah,3Ah,3Ah,3Ah,3Ah,3Ah,3Ah,3Ah;03       - земля                        
+                DB      0Ch, 03h,03h,01h,03h,03h,02h,03h,03h;04       - кирпич (уничтожаемый)        
+                DB      0Fh, 04h,4Fh,10h,20h,14h,03h,14h,20h;05       - человечек (грызет алмазы)    
+                DB      0Ah, 23h,23h,23h,20h,23h,23h,23h,20h;06       - звери (охотятся на человечка)
+                DB      0Ch, 17h,17h,17h,17h,17h,17h,17h,17h;07       - бетон (неуничтожаемый)       
+                ; Спрайты - движение
+                DB      0Bh, 2Fh,2Ah,5Ch,20h,5Ch,2Ah,2Fh,20h;08
+                DB      07h, 20h,20h,20h,20h,20h,20h,20h,20h;09
+                DB      0Bh, 5Ch,2Ah,2Fh,20h,20h,20h,20h,20h;10       - алмаз падает вниз (11,10)
+                DB      0Bh, 20h,20h,20h,20h,2Fh,2Ah,5Ch,20h;11
+                DB      07h, 20h,20h,20h,20h,20h,20h,20h,20h;12
+                DB      07h, 20h,20h,20h,20h,20h,20h,20h,20h;13
+                DB      07h, 20h,20h,20h,20h,20h,20h,20h,20h;14
+                DB      0Fh, 02h,03h,03h,20h,20h,20h,20h,20h;15       - камень падает вниз (16,15)
+                DB      0Fh, 20h,20h,20h,20h,16h,17h,17h,10h;16
+                ; Спрайты человечка
+                DB      0Fh, 04h,4Fh,10h,20h,14h,03h,1Ch,20h;17
+                DB      0Fh, 1Ch,03h,14h,20h,20h,20h,20h,20h;18
+                DB      0Fh, 20h,20h,20h,20h,04h,4Fh,10h,20h;19
+                DB      0Fh, 20h,20h,20h,20h,04h,4Fh,10h,20h;20
+                DB      0Fh, 20h,20h,20h,20h,04h,4Fh,10h,20h;21
+                DB      0Fh, 20h,20h,20h,4Fh,20h,20h,04h,13h;22
+                DB      0Fh, 10h,20h,20h,20h,10h,20h,20h,20h;23
+                DB      0Fh, 20h,4Fh,10h,20h,14h,03h,14h,20h;24
+                DB      0Fh, 20h,20h,04h,4Fh,20h,20h,04h,07h;25
+                DB      0Fh, 20h,20h,20h,20h,10h,20h,20h,20h;26
+                DB      0Fh, 04h,4Fh,20h,20h,14h,03h,14h,20h;27
+                ; Спрайты существ
+                DB      0Ah, 2Bh,2Bh,2Bh,20h,2Bh,2Bh,2Bh,20h;28
+                DB      0Ah, 2Bh,20h,20h,20h,2Bh,20h,20h,20h;29
+                DB      0Ah, 2Bh,20h,20h,20h,2Bh,20h,20h,20h;30
+                DB      0Ah, 20h,20h,2Bh,2Bh,20h,20h,2Bh,2Bh;31
+                DB      0Ah, 2Bh,2Bh,2Bh,20h,20h,20h,20h,20h;32
+                DB      0Ah, 20h,20h,20h,20h,2Bh,2Bh,2Bh,20h;33
+                DB      0Ah, 20h,20h,20h,20h,2Bh,2Bh,2Bh,20h;34
+                DB      0Ah, 2Fh,20h,2Fh,20h,20h,2Fh,20h,2Fh;35
+                DB      0Ah, 2Bh,20h,20h,20h,2Bh,20h,20h,20h;36
+                DB      0Ah, 2Bh,20h,20h,20h,2Bh,20h,20h,20h;37
+                DB      0Ah, 20h,20h,20h,20h,2Bh,2Bh,2Bh,20h;38
+                DB      0Ah, 20h,20h,20h,20h,2Bh,2Bh,2Bh,20h;39
+                DB      0Ah, 20h,20h,20h,20h,2Bh,2Bh,2Bh,20h;40
+                DB      0Ah, 20h,20h,20h,20h,2Bh,2Bh,2Bh,20h;41
+                ; Это у нас курсор для редактирования лабиринта
+                DB      0Fh, 17h,17h,17h,17h,17h,17h,17h,17h;42
+                ; Заготовки для надписей LIVES, SCORE
+                DB      0Eh, 20h,20h,20h,20h,17h,20h,20h,20h;43
+                DB      0Eh, 17h,20h,20h,20h,17h,14h,14h,10h;44
+                DB      0Eh, 20h,20h,20h,20h,20h,07h,13h,20h;45
+                DB      0Eh, 20h,06h,11h,20h,20h,16h,15h,20h;46
+                DB      0Eh, 20h,20h,20h,20h,17h,20h,06h,11h;47
+                DB      0Eh, 07h,10h,16h,01h,02h,15h,13h,20h;48
+                DB      0Eh, 20h,20h,20h,20h,17h,03h,03h,01h;49
+                DB      0Eh, 17h,03h,03h,20h,17h,14h,14h,10h;50
+                DB      0Eh, 20h,20h,20h,20h,16h,03h,03h,01h;51
+                DB      0Eh, 02h,03h,07h,10h,14h,14h,16h,01h;52
+                DB      0Eh, 17h,20h,20h,20h,07h,14h,14h,10h;53
+                DB      0Eh, 20h,20h,20h,20h,16h,03h,07h,10h;54
+                DB      0Eh, 17h,20h,06h,11h,07h,14h,16h,01h;55
+                DB      0Eh, 20h,20h,20h,20h,17h,03h,07h,10h;56
+                DB      0Eh, 17h,14h,16h,01h,17h,02h,05h,10h;57
+                DB      0Eh, 20h,20h,20h,20h,20h,17h,20h,20h;58
+                DB      0Eh, 20h,20h,20h,20h,20h,17h,20h,20h;59
+                ; Цифры, верхние части
+                DB      0Fh, 17h,06h,06h,11h,07h,15h,16h,01h;60
+                DB      0Fh, 20h,06h,11h,20h,20h,16h,15h,20h;61
+                DB      0Fh, 20h,14h,16h,01h,16h,15h,14h,10h;62
+                DB      0Fh, 20h,02h,07h,10h,07h,14h,16h,01h;63
+                DB      0Fh, 16h,14h,17h,10h,20h,20h,17h,20h;64
+                DB      0Fh, 03h,03h,07h,10h,07h,14h,16h,01h;65
+                DB      0Fh, 17h,03h,07h,10h,07h,14h,16h,01h;66
+                DB      0Fh, 20h,04h,13h,20h,20h,06h,11h,20h;67
+                DB      0Fh, 16h,03h,07h,10h,07h,14h,16h,01h;68
+                DB      0Fh, 07h,14h,16h,11h,14h,14h,16h,01h;69
+                ; Тоже цифры, нижние части
+                DB      0Fh, 20h,20h,20h,20h,16h,03h,17h,10h;70
+                DB      0Fh, 20h,20h,20h,20h,20h,16h,11h,20h;71
+                DB      0Fh, 20h,20h,20h,20h,16h,03h,07h,10h;72
+                DB      0Fh, 20h,20h,20h,20h,16h,03h,07h,10h;73
+                DB      0Fh, 20h,20h,20h,20h,20h,12h,17h,20h;74
+                DB      0Fh, 20h,20h,20h,20h,17h,03h,03h,01h;75
+                DB      0Fh, 20h,20h,20h,20h,16h,03h,03h,01h;76
+                DB      0Fh, 20h,20h,20h,20h,03h,03h,07h,11h;77
+                DB      0Fh, 20h,20h,20h,20h,16h,03h,07h,10h;78
+                DB      0Fh, 20h,20h,20h,20h,16h,03h,07h,10h;79
+                ; Заготовки для заставки (надпись BOLDER)
+                DB      0Fh, 20h,20h,17h,17h,20h,20h,20h,20h;80
+                DB      0Fh, 20h,20h,20h,20h,20h,20h,17h,17h;81
+                DB      0Fh, 20h,20h,17h,17h,20h,20h,17h,17h;82
+                DB      0Fh, 20h,20h,20h,20h,17h,17h,20h,20h;83
+                DB      0Fh, 20h,20h,17h,17h,17h,17h,20h,20h;84
+                DB      0Fh, 20h,20h,20h,20h,17h,17h,17h,17h;85
+                DB      0Fh, 20h,20h,17h,17h,17h,17h,17h,17h;86
+                DB      0Fh, 17h,17h,20h,20h,20h,20h,20h,20h;87
+                DB      0Fh, 17h,17h,17h,17h,20h,20h,20h,20h;88
+                DB      0Fh, 17h,17h,20h,20h,20h,20h,17h,17h;89
+                DB      0Fh, 17h,17h,17h,17h,20h,20h,17h,17h;90
+                DB      0Fh, 17h,17h,20h,20h,17h,17h,20h,20h;91
+                DB      0Fh, 17h,17h,17h,17h,17h,17h,20h,20h;92
+                DB      0Fh, 17h,17h,20h,20h,17h,17h,17h,17h;93
+ .size          =       $-SPRT
+
+                ; Начальная заставка
+GameTitle:      DB      0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+                DB      82,88,83,0,0,0,91,0,0,0,91,0,0,0,0,0
+                DB      82,85,87,81,85,0,91,0,81,85,91,81,85,0,83,83
+                DB      82,0,91,91,0,91,91,0,91,0,91,93,85,87,92,0
+                DB      82,85,87,89,85,87,89,83,89,84,91,89,85,83,91,0
+                DB      0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+                DB      88,88,88,88,88,88,88,88,88,88,88,88,88,88,88,88
+                DB      0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+                DB      0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+                DB      0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+                DB      0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+                DB      0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+
+                ; Экран с информацией об очках и жизнях
+GameScore:      DB      4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4
+                DB      4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4
+                DB      3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3
+                DB      3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3
+                DB      3,0,43,45,47,49,51,58,0,0,0,0,0,0,0,3
+                DB      3,0,44,46,48,50,52,59,0,0,0,0,0,0,0,3
+                DB      3,0,51,51,54,56,49,58,0,0,0,0,0,0,0,3
+                DB      3,0,52,53,55,57,50,59,0,0,0,0,0,0,0,3
+                DB      3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3
+                DB      3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3
+                DB      3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3
+                DB      4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4
+
+                ; Начальное меню (тебю;)
+TXTMainMenu:    DB      _ATTR,0Eh
+                DB      _XY,35,18,'PLAY THE GAME'       ; # 0
+                DB      _XY,35,20,'LEVEL DESIGN'        ; # 1
+                DB      _XY,35,22,'DEMO (WHOLE GAME)'   ; # 2
+                DB      _XY,35,24,'EXIT',_END           ; # 3
+                ;
+TXTMenuSelector:DB      _ATTR,00h
+                DB      _XY,31,18,'   '                 ; # 0
+                DB      _XY,31,20,'   '                 ; # 1
+                DB      _XY,31,22,'   '                 ; # 2
+                DB      _XY,31,24,'   '                 ; # 3
+                DB      _ATTR,0Ah,_XY,31,_MEM,'-->',0CH,_END
+                ;
+LEVTXT:         DB      _ATTR,0Eh,_XY,28,1,'LEVEL: ',_ATTR,0Fh,_SUBSTR,0,_END
+SCOTXT:         DB      _ATTR,0Eh,_XY,60,1,'SCORE: ',_ATTR,0Fh,_SUBSTR,1,_END
+POPTXT:         DB      _ATTR,0Eh,_XY,45,1,'LIVES: ',_ATTR,0Fh,_SUBSTR,2,_END
+EDTTXT:         DB      _ATTR,0Eh,_XY,63,1,'EDIT MODE',_END
+TSTTXT:         DB      _ATTR,0Eh,_XY,63,1,'TEST MODE',_END
+DMOTXT:         DB      _ATTR,0Eh,_XY,63,1,'DEMO MODE',_END
+SELTXT:         DB      _ATTR,0Eh,_XY,61,1,'SELECT MODE',_END
+DEMOAVAILTXT:   DB      _ATTR,0Eh,_XY,42,1,'DEMO AVAILABLE',_END
+TXTVR:          DB      _ATTR,0Fh,_XY,7,1,' VERSION 3.2 PC',_END
+COPYR_TXT:      DB      _ATTR,0Bh,_XY,53,1,'BY YSOFT LAB., 1991',_END
+SubStringAddr:  DD      _levno, _scores, _lives
+
+                .udata
+_levno:         rb      3+1             ; 3 символа
+_scores:        rb      5+1             ; 5 символов
+_lives:         rb      2+1             ; 2 символов
+
+;=== UDATA ====================================================================
+                .udata
+                ; Структура для определения рабочего экрана 
+                ; (аналог консоли, но свой, со своими символами)
+                ; 
+                ; Существует 3 экрана:
+                ;   1. scr.screen      - Экран программы (текстовый)
+                ;   2. scr.cachescreen - Экран программы, кешированный (текстовый)
+                ;   3. scr.vmem        - Экран вывода (графический)
+struct          scrinfo
+enable          rd      1                               ; =0 - рисование запрещено; >0 - рисование разрешено
+dc              rd      1                               ; Контекст для рисования
+dib             rd      1                               ; Bitmap для рисования
+vmem            rd      1                               ; Битовые данные Bitmap(dib)
+pixels          POINT                                   ; Размеры экрана в пикселах
+chars           POINT                                   ; Размеры экрана в символах
+pitch           rd      1                               ; Размер скан-строки, в байтах
+screen          rw      SCREEN_WIDTH*SCREEN_HEIGHT      ; Рабочий экран
+cachescreen     rw      SCREEN_WIDTH*SCREEN_HEIGHT      ; Экран, с нарисованными в mem символами
+translADDR      rd      SCREEN_WIDTH*SCREEN_HEIGHT      ; Таблица для вычисления адреса по смещению символа
+translCH        rd      256                             ; Таблица для вычисления адреса маски символа
+palitre         rd      16                              ; Палитра
+bih             BITMAPINFOHEADER                        ; Информация о картинке (vmem - адрес битовых данных картинки)
+fontdata2       db      256*CHAR_HEIGHT dup(?)          ; "Распакованный" шрифт
+ends
+
+struct          LARGE_INTEGER
+low             rd      1
+high            rd      1
+ends
+
+MainWindowClass rd      1
+MainWindow      rd      1
+scr             scrinfo
+
+                ; НЕИНИЦИАЛИЗИРОВАННЫЕ ДАННЫЕ
+GameMode        RD      1               ; Код режима игры
+MenuNo          RB      1               ; Текущий пункт меню
+KLW             RW      1               ; Кол-во драгоценностей
+KOD             RW      1               ; Код нажатой клавиши
+PRT             RB      1
+KOORD           RW      1               ; Координаты человечка
+Level           RD      1               ; Номер текущего лабиринта
+Popitk          RB      1
+OBK             RD      1               ; Очки
+PSK             RB      1
+ScrollArea      RB      16*12*2
+SoundsCount     RW      1
+PlayerDie       RB      1               ; Флаг дохлого человечка
+Maze            RB      16*12           ; Тут наш лабиринт
+                RB      16              ; Кирпичи, чтобы камни не проваливались
+MazeWork        RB      (16+2)*(12+2)
+                ;
+RecAddr         RW      1               ; Текущий адрес записи/воспроизведения
+RecBegin        RW      1               ; Начало записи/воспроизведения
+RecRecCode      RW      1               ; Текущие данные для записи
+RecPlayCode     RB      1               ; Текущие данные для воспроизведения
+RecCount        RW      1               ; Длина записи
+RecArray        RB      REC_AREA_SIZE   ; Массив записи
+                ;
+tmp_level_data  RB      256
+_Resource       RB      RESOURCE_AREA_SIZE
+
+resaddr         RD      1               ; Адрес ресурсов
+reschanged      RB      1               ; Флаг измененного ресурса
+
+MenuMemX        RB      1
+MenuMemY        RB      1
+
+;=== CODE =====================================================================
+                .code
+proc            CreateScreen    wchar:DWORD, hchar:DWORD
+                invoke  RtlZeroMemory, scr, sizeof.scrinfo
+                ;
+                xor     eax, eax
+                mov     [scr.dc], eax
+                mov     [scr.dib], eax
+                ;
+                mov     eax, [wchar]
+                mov     [scr.chars.x], eax
+                imul    eax, CHAR_WIDTH         ; Ширина символа
+                mov     [scr.pixels.x], eax
+                ;
+                mov     eax, [hchar]
+                mov     [scr.chars.y], eax
+                imul    eax, CHAR_HEIGHT        ; Высота символа
+                mov     [scr.pixels.y], eax
+                ;
+                mov     eax, [scr.pixels.x]
+                shl     eax, 2                  ; "размер" одного пиксела - 4 байта: "0 R G B"
+                mov     [scr.pitch], eax
+                ;
+                ; Создать DC
+                ;
+                invoke  CreateCompatibleDC, 0
+                mov     [scr.dc], eax
+                or      eax, eax
+                jnz     .L1
+
+                SYSTEMERROR     ActionCreateCompDC
+                stdcall ShowError, ErrorCreateImageDC, 0, 0
+
+ .L1:           ;
+                ; Создать bitmap, для рисования и вывода в окно
+                ;
+                invoke  RtlZeroMemory, scr.bih, sizeof.BITMAPINFOHEADER
+                lea     edx, [scr.bih]
+                mov     [edx + BITMAPINFOHEADER.biSize], sizeof.BITMAPINFOHEADER
+                ;
+                mov     eax, [scr.pixels.x]
+                mov     [edx + BITMAPINFOHEADER.biWidth], eax
+                ;
+                mov     eax, [scr.pixels.y]
+                neg     eax                             ; top-down, т.е. начало блока памяти - левый-верхний пиксел
+                mov     [edx + BITMAPINFOHEADER.biHeight], eax
+                ;
+                mov     [edx + BITMAPINFOHEADER.biPlanes], 1
+                mov     [edx + BITMAPINFOHEADER.biBitCount], 32
+                mov     [edx + BITMAPINFOHEADER.biCompression], BI_RGB
+                ;;mov     [edx + BITMAPINFOHEADER.biSizeImage], 0
+                ;;mov     [edx + BITMAPINFOHEADER.biXPelsPerMeter], 0
+                ;;mov     [edx + BITMAPINFOHEADER.biYPelsPerMeter], 0
+                ;;mov     [edx + BITMAPINFOHEADER.biClrUsed], 0
+                ;;mov     [edx + BITMAPINFOHEADER.biClrImportant], 0
+                ;
+                invoke  CreateDIBSection, \
+                        [scr.dc], \
+                        edx, \
+                        DIB_RGB_COLORS, \
+                        scr.vmem, \
+                        NULL, 0
+                mov     [scr.dib], eax
+                or      eax, eax
+                jnz     .L2
+
+                SYSTEMERROR   ActionCreateDIBSect
+                stdcall ShowError, ErrorCreateImageDIB, 0, 0
+
+ .L2:           ;
+                ; Установить размеры клиентской части окна 
+                ; (вначале размер клиентской части равен размеру экрана)
+                ;
+                stdcall SetClientSize, [MainWindow], [scr.pixels.x], [scr.pixels.y]
+                ;
+                ; Распаковка шрифта
+                ;
+                call    PrepareFont
+                ;
+                ; Создать перекодировочную таблицу для вычисления адреса экрана
+                ; addr = y * CHAR_HEIGHT * scr.pixels.x + x * CHAR_WIDTH
+                ; offset = pixel * 4 + scr.mem
+                ;
+                lea     edi, [scr.translADDR]
+                mov     ebx, 0                  ; for(y=0; y<scr.chars.y; y++)
+                ;
+.LoopY:         mov     ecx, 0                  ; for(x=0; x<scr.chars.x; x++)
+                imul    eax, ebx, CHAR_HEIGHT   ; вынос подвыражения (y * CHAR_HEIGHT * scr.pixels.x) за пределы цикла
+                imul    eax, [scr.pixels.x]
+                ;
+.LoopX:         imul    edx, ecx, CHAR_WIDTH
+                add     edx, eax
+                shl     edx, 2
+                add     edx, [scr.vmem]
+                mov     [edi], edx
+                add     edi, 4
+                ;
+                loopb   ecx, [scr.chars.x], .LoopX
+                loopb   ebx, [scr.chars.y], .LoopY
+                ;
+                ; Создать перекодировочную таблицу для вычисления адреса символа
+                ;
+                xor     ecx, ecx                ; for(ecx=0; ecx<256; ecx++)
+ .tr2:          imul    eax, ecx, CHAR_HEIGHT
+                add     eax, scr.fontdata2
+                mov     [scr.translCH+ecx*4], eax
+                inc     cl
+                jnz     .tr2
+                ;
+                ; Инициализация экранов
+                ;
+                lea     edi, [scr.screen]
+                mov     ecx, SCREEN_WIDTH*SCREEN_HEIGHT
+                mov     ax, 0F20h
+                rep     stosw
+                ;
+                lea     edi, [scr.cachescreen]
+                mov     ecx, SCREEN_WIDTH*SCREEN_HEIGHT
+                not     ax                      ; Чтобы в первый раз перерисовать в scr.vmem весь экран
+                rep     stosw
+                ;
+                ; Подготовка палитры по умолчанию
+                ;
+                lea     esi, [defaultpalitre]
+                lea     edi, [scr.palitre]
+                mov     ecx, 16
+                rep     movsd
+                ;
+                ; Разрешаем рисование
+                ;
+                mov     [scr.enable], -1
+                ;
+                ; Показать то, что скрыто
+                ;
+                invoke  ShowWindow, [MainWindow], SW_SHOWNORMAL
+                ret
+endp
+
+proc            DeleteScreen
+                invoke  DeleteObject, [scr.dib]
+                invoke  DeleteDC, [scr.dc]
+                ret
+endp
+
+proc            CreateMainWindow
+                local   wc:WNDCLASS
+                ;
+                xor     eax, eax
+                mov     [MainWindow], eax
+                mov     [MainWindowClass], eax
+                ;
+                ; Регистрация класса
+                ;
+                invoke  RtlZeroMemory, addr wc, sizeof.WNDCLASS
+                ;
+                ;;mov     [wc.style], 0
+                mov     [wc.lpfnWndProc], MainWindowProc
+                ;;mov     [wc.cbClsExtra], 0              ; no extra class data
+                ;;mov     [wc.cbWndExtra], 0              ; no extra window data
+
+                invoke  GetModuleHandle, 0
+                mov     [wc.hInstance], eax
+
+                ;;mov     [wc.hIcon], NULL                ; NULL, no icon
+
+                invoke  LoadCursor, 0, IDC_ARROW        ; Загружаем курсор по умолчанию
+                mov     [wc.hCursor], eax
+
+                ;;mov     [wc.hbrBackground], 0           ; =0, значит приложение само рисует клиентскую часть
+                ;;mov     [wc.lpszMenuName], NULL         ; NULL, no menu
+                mov     [wc.lpszClassName], MainWindowClassName
+
+                invoke  RegisterClassW, addr wc
+                mov     [MainWindowClass], eax
+                test    eax, eax
+                jnz     .L1
+                
+                SYSTEMERROR     ActionRegisterClass
+                stdcall ShowError, ErrorCreateMainClass, 1
+                
+ .L1:           ;
+                ; Создание главного окна (но пока не показываем его)
+                ;
+                invoke  CreateWindowEx, \
+                        WS_EX_OVERLAPPEDWINDOW, \
+                        MainWindowClassName, \
+                        MainWindowTitle, \
+                        WS_OVERLAPPEDWINDOW, \
+                        CW_USEDEFAULT, 0, \
+                        200, 200, \
+                        0, 0, [wc.hInstance], 0
+                mov     [MainWindow], eax
+                test    eax, eax
+                jnz     .L2
+
+                SYSTEMERROR     ActionCreateWindow
+                stdcall ShowError, ErrorCreateMainWindow, 0, 0
+
+ .L2:           ret
+endp
+
+proc            DeleteMainWindow
+                invoke  DestroyWindow, [MainWindow]
+                invoke  UnregisterClass, MainWindowClassName, 0
+                ret
+endp
+
+proc            SetClientSize   hWnd:DWORD, clientWidth:DWORD, clientHeight:DWORD
+                local   clientRect:RECT
+                local   windowRect:RECT
+                ; Определяем размеры клиентской части окна
+                invoke  GetClientRect, [MainWindow], addr clientRect
+                ; Определяем размеры окна
+                invoke  GetWindowRect, [MainWindow], addr windowRect
+                ; Т.к. функции установки размеров клиентской части окна нет, то делаем следующее:
+                ; нужно вычислить размер бордюров и прочих элементов, для этого нужно 
+                ; от текущих размеров окна вычесть размер клиентской части, 
+                ; w = windowRect.Right-windowRect.Left-clientRect.right
+                ; h = windowRect.Bottom-windowRect.Top-clientRect.bottom
+                ; и прибавить к w новый размер клиентской части
+                ; w += clientWidth
+                ; h += clientHeigh
+                ; Полученные значения w, h есть размеры окна, у которого размер клиентской части
+                ; будет clientWidth, clientHeight
+                mov     eax, [windowRect.right]
+                sub     eax, [windowRect.left]
+                sub     eax, [clientRect.right]
+                add     eax, [clientWidth]
+                ;
+                mov     ebx, [windowRect.bottom]
+                sub     ebx, [windowRect.top]
+                sub     ebx, [clientRect.bottom]
+                add     ebx, [clientHeight]
+                ;
+                invoke  SetWindowPos, \
+                        [MainWindow], \
+                        0, \                            ; not used
+                        0, 0, \                         ; not used
+                        eax, ebx, \                     ; new width and height
+                        SWP_NOMOVE + SWP_NOZORDER       ; меняем только размеры окна!
+                ret
+endp
+
+proc            UpdateScreen
+                local   client:RECT
+                local   ps:PAINTSTRUCT
+                local   paintdc:DWORD
+                ;
+                cmp     [scr.enable], 0                 ; Есть что рисовать?
+                jz      .Done
+                pushad
+                ;
+                ; Сначала нужно подготовить экран, для этого:
+                ; сравнивам символы из scr.screen с символами scr.cachescreen
+                ; и если символ неравен, то рисуем его в картинке scr.vmem
+                ;
+                push    ebp
+                mov     edx, 0
+ .L1:           mov     ax, [scr.screen+edx*2]
+                cmp     ax, [scr.cachescreen+edx*2]
+                je      .L2
+                mov     [scr.cachescreen+edx*2], ax
+                movzx   esi, al
+                mov     esi, [scr.translCH+esi*4]       ; esi=адрес битовой карты символа
+                mov     edi, [scr.translADDR+edx*4]     ; edi=адрес символа в scr.vmem
+                ;
+                movzx   ebx, ah
+                shr     bl, 4
+                mov     ebx, [scr.palitre + ebx*4]      ; ebx=цвет фона
+                movzx   ecx, ah
+                and     cl, 0fh
+                mov     ecx, [scr.palitre + ecx*4]      ; ecx=цвет символа
+                ;
+                mov     ah, CHAR_HEIGHT
+ .L3:           mov     al, [esi]
+                ;
+            repeat 8
+                test    al, 1 SHL (8-%)
+                cmovz   ebp, ebx
+                cmovnz  ebp, ecx
+                mov     [edi + (%-1) * 4], ebp
+            end repeat
+                ;
+                add     edi, [scr.pitch]
+                inc     esi
+                dec     ah
+                jnz     .L3
+ .L2:           loopb   edx, SCREEN_WIDTH*SCREEN_HEIGHT, .L1
+                pop     ebp
+                ;
+                ; А теперь выводим картинку, нарисованную в scr.vmem, в клиентскую часть окна 
+                ;
+                invoke  GetClientRect, [MainWindow], addr client
+                invoke  BeginPaint, [MainWindow], addr ps
+                mov     [paintdc], eax
+                ;
+;                invoke  SelectObject, [scr.dc], [scr.dib]
+;                push    eax
+                ;
+;                invoke  StretchBlt, \
+;                        [paintdc], 0, 0, [client.right], [client.bottom], \
+;                        [scr.dc], 0, 0, [scr.w], [scr.h], \
+;                        SRCCOPY
+                invoke  StretchDIBits, \
+                        [paintdc], \
+                        0, 0, [client.right], [client.bottom], \
+                        0, 0, [scr.pixels.x], [scr.pixels.y], \
+                        [scr.vmem], scr.bih, DIB_RGB_COLORS, SRCCOPY
+                ;
+;                pop     eax
+;                invoke  SelectObject, [scr.dc], eax
+                ;
+                invoke  EndPaint, [MainWindow], addr ps
+                ;
+                popad
+.Done:          ret
+endp
+
+proc            MainWindowProc  hwnd, uMsg, wParam, lParam
+                mov     eax, [uMsg]
+                be      eax, WM_PAINT, .paint
+                be      eax, WM_DESTROY, .destroy
+                be      eax, WM_SIZE, .resize
+                be      eax, WM_KEYDOWN, .keydown
+                be      eax, WM_KEYUP, .keyup
+                be      eax, WM_TIMER, .timer
+                invoke  DefWindowProc, [hwnd], [uMsg], [wParam], [lParam]       ; default window proc
+                ret
+                ;
+ .keydown:      movzx   eax, word [wParam]
+                mov     [ScanKeyboardMap+eax], TRUE
+                mov     [KeyCode], eax
+                xor     eax, eax
+                ret
+                ;
+ .keyup:        movzx   eax, byte [wParam]
+                mov     [ScanKeyboardMap+eax], FALSE
+                mov     [KeyCode], 0
+                xor     eax, eax
+                ret
+                ;
+ .destroy:      invoke  PostQuitMessage, 0
+                xor     eax, eax
+                ret
+                ;
+ .paint:        call    UpdateScreen
+                xor     eax, eax
+                ret
+                ;
+ .resize:       invoke  InvalidateRect, [MainWindow], NULL, FALSE
+                xor     eax, eax
+                ret
+                ;
+ .timer:        mov     [TimerEvent], TRUE
+                xor     eax, eax
+                ret
+endp
+
+                .udata
+KeyCode         RD      1               ; Код последней нажатой клавиши
+TimerEvent      RD      1               ; =TRUE, если сработал таймер
+ScanKeyboardMap RB      256             ; Карта нажатых клавиш
+
+                ; Коды выхода из ProcessMessages
+PM_QUIT         equ     -1
+PM_TIMER        equ     -2
+
+                ; Флаги условий выхода из цикла
+PM_EXIT_BY_TIMER        equ     00000001h
+PM_EXIT_BY_KEY          equ     00000002h
+
+                .code
+                ;
+                ; ProcessMessages - обработать входящие сообщения
+                ; Основная процедура для работы с клавиатурой
+                ;
+                ; IN    flags - Условия выхода из цикла (PM_EXIT_BY_TIMER, PM_EXIT_BY_KEY)
+                ;
+                ;       delay - Задержка, в интервалах скорости игры 
+                ;               (используется, если указан флаг PM_EXIT_BY_TIMER)
+                ;               В процессе ожидания устанавливаем/сбрасываем флаги нажатых
+                ;               клавиш в массиве ScanKeyboardMap.
+                ;                               
+                ; REMARK        Если delay = 0, устанавливается флаг PM_EXIT_BY_KEY
+                ;
+                ; OUT   eax = PM_QUIT, требуется выход из программы (нажата клавиша Alt+F4, или кнопка закрытия окна)
+                ;       eax = PM_TIMER, выход по истечению таймера
+                ;       eax = 0 .. 255, выход по нажатию клавиши (eax=код клавиши)
+                ;
+proc            ProcessMessages flags:DWORD, delay:DWORD
+                local   msg:MSG
+                ;
+                pushad
+                mov     [KeyCode], FALSE
+                mov     [TimerEvent], FALSE
+                invoke  InvalidateRect, [MainWindow],NULL,FALSE ; Перерисовываем экран
+                ;
+                fclear? [flags], PM_EXIT_BY_TIMER, .L1          ; Проверяем параметры
+                bne     [delay], 0, .Loop
+                mov     [delay], 1
+                jmp     .Loop
+                ;
+ .L1:           fset?   [flags], PM_EXIT_BY_KEY, .Loop          ; Выход по таймеру не задан, 
+                or      [flags], PM_EXIT_BY_KEY                 ; проверяем выход по клавише
+                ;
+ .Loop:         invoke  GetMessage, addr msg, 0, 0, 0           ; Читаем ЛЮБОЕ сообщение
+                be      eax, 0, .PM_QUIT
+                invoke  TranslateMessage, addr msg              ; Трансляция сообщения
+                invoke  DispatchMessage, addr msg               ; Обработка сообщения
+                ;
+                be      [KeyCode], FALSE, .L2                   ; Проверка на нажатие клавиши
+                fset?   [flags], PM_EXIT_BY_KEY, .PM_KEY        ; Требуется выйти по нажатию клавиши?
+                ;
+ .L2:           bne     [TimerEvent], TRUE, .Loop               ; Проверка на таймер
+                fclear? [flags], PM_EXIT_BY_TIMER, .Loop        ; Требуется выйти по таймеру?
+                dec     [delay]
+                jz      .L3
+                mov     [TimerEvent],FALSE                      ; Ожидаем следующего события таймера
+                jmp     .Loop
+ .L3:           popad
+                return  PM_TIMER
+                ;
+ .PM_QUIT:      popad
+                return  PM_QUIT
+                ;
+ .PM_KEY:       popad
+                return  [KeyCode]
+endp
+
+                ; Load file into memory
+                ;
+                ; IN:   fileName - file of the loading file
+                ;       fileBuffer - buffer, where the file is loading
+                ;       fileBufferSize - size of the buffer
+                ;
+                ; OUT:  CF=1, if error
+                ;       CF=0, otherwise
+proc            LoadFile        fileName:DWORD, fileBuffer:DWORD, fileBufferSize:DWORD
+                local   fileSize:LARGE_INTEGER
+                local   h:DWORD
+                local   fileReaded:DWORD
+
+                pushad
+                invoke  CreateFile, [fileName], GENERIC_READ, \ ; Открываем файл для чтения
+                        0, NULL, OPEN_EXISTING, 0, 0
+                mov     [h], eax
+                cmp     eax, INVALID_HANDLE_VALUE
+                jne     .L1
+                SYSTEMERROR     ActionOpenFile
+                jmp     .fail
+
+ .L1:           invoke  GetFileSizeEx, [h], addr fileSize       ; Определяем размер файла
+                or      eax, eax
+                jnz     .L2
+                SYSTEMERROR     ActionGetFileSize
+                jmp     .fail
+
+ .L2:           mov     eax, [fileSize.high]                    ; Проверяем максимальный размер
+                or      eax, eax
+                jnz     .L3
+                mov     eax, [fileSize.low]
+                cmp     eax, [fileBufferSize]
+                jbe     .L4
+ .L3:           USERERROR       , ErrorResourceTooBig
+                jmp     .fail
+
+ .L4:           invoke  ReadFile, [h], [fileBuffer], \          ; Читаем файл
+                        [fileSize.low], addr fileReaded, NULL
+                or      eax, eax
+                jz      .L5
+                mov     eax, [fileReaded]
+                cmp     eax, [fileSize.low]
+                je      .L6
+
+                USERERROR       , ErrorReadNotEqRequested
+                jmp     .fail
+
+ .L5:           SYSTEMERROR     ActionReadFile
+                jmp     .fail
+
+ .L6:           invoke  CloseHandle, [h]                        ; Закрываем файл
+                or      eax, eax
+                clc
+                jnz     .return
+
+                SYSTEMERROR     ActionCloseHandle
+
+ .fail:         stc
+ .return:       popad
+                ret
+endp
+
+proc            SaveFile        fileName:DWORD, fileBuffer:DWORD, fileSize:DWORD
+                local   h:DWORD
+                local   fileWritten:DWORD
+
+                pushad
+                invoke  CreateFile, [fileName], GENERIC_WRITE, \        ; Открываем файл для записи
+                        0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL
+                mov     [h], eax
+                or      eax, eax
+                jnz     .L1
+                SYSTEMERROR     ActionCreateFile
+                jmp     .fail
+
+ .L1:           invoke  WriteFile, [h], [fileBuffer], \                 ; Записываем в файл
+                        [fileSize], addr fileWritten, NULL
+                or      eax, eax
+                jz      .L2
+                mov     eax, [fileWritten]
+                cmp     eax, [fileSize]
+                je      .L3
+                USERERROR       , ErrorWritedNotEqRequested
+                jmp     .fail
+
+ .L2:           SYSTEMERROR     ActionWriteFile
+                jmp     .fail
+
+ .L3:           invoke  CloseHandle, [h]                                ; Закрываем файл
+                or      eax, eax
+                clc
+                jnz     .return
+                SYSTEMERROR     ActionCloseHandle
+
+ .fail:         stc
+ .return:       popad
+                ret
+endp
+
+;==============================================================================;
+;  MAIN BOLDER                                                                 ;
+;==============================================================================;
+                .code
+proc            start
+                lea     eax, [ExpandLevel]
+
+                stdcall crc32InitTable
+                stdcall LoadMainFiles           ; В этой процедуре можем выйти
+                ;
+                stdcall SetVideoModes
+                call    InstallKeyboard
+                call    DrawFrameBolder         ; Находится на экране постоянно
+                mov     [MenuNo],0
+
+                ;=== НАЧАЛО - Main Menu ===
+MainMenu:       mov     [GameMode],MODE_MENU
+                mov     esi,BLACK_SCREEN
+                mov     edi,GameTitle
+                call    SlideUpAndBeep          ; Чёрные экран -> заставка
+                ;
+MenuSelect:     mov     [GameMode],MODE_MENU
+                mov     esi,TXTMainMenu         ; Рисуем меню
+                call    DrawTextBolder
+                ;
+MenuLoop:       mov     al,[MenuNo]
+                shl     al,1
+                add     al,18
+                mov     [MenuMemY],al
+                ;
+                mov     esi,TXTMenuSelector
+                call    DrawTextBolder
+                ;
+                stdcall ProcessMessages, PM_EXIT_BY_KEY, 0
+                switch  eax, PM_QUIT,   .MenuQuit,   \
+                             VK_UP,     .MenuUp,     \
+                             VK_DOWN,   .MenuDown,   \
+                             VK_ESCAPE, .MenuQuit,   \
+                             VK_RETURN, .MenuSelect, \
+                             VK_HOME,   .MenuHome,   \
+                             VK_END,    .MenuEnd
+                jmp     MenuLoop
+                ;
+ .MenuSelect:   mov     al,[MenuNo]
+                switch  al,0, .MenuGame, \
+                           1, .MenuEdit, \
+                           2, .MenuDemo, \
+                           3, .MenuQuit
+                jmp     MenuLoop
+                ;
+ .MenuHome:     mov     [MenuNo], 0
+                jmp     MenuLoop
+                ;
+ .MenuEnd:      mov     [MenuNo], 11b
+                jmp     MenuLoop
+                ;
+ .MenuUp:       mov     al,[MenuNo]
+                dec     al
+                and     al,11b
+                mov     [MenuNo],al
+                jmp     MenuLoop
+                ;
+ .MenuDown:     mov     al,[MenuNo]
+                inc     al
+                and     al,11b
+                mov     [MenuNo],al
+                jmp     MenuLoop
+                ;
+ .MenuEdit:     stdcall SelectLevelForEditing
+                mov     [GameMode],MODE_MENU
+                mov     esi,Maze
+                mov     edi,GameTitle
+                call    SlideUp
+                jmp     MenuSelect
+                ;
+ .MenuGame:     ;;;call    GAME
+                jmp     MenuSelect
+                ;
+ .MenuDemo:     ;;;call    DEMO_ALL
+                jmp     MainMenu
+                ;
+ .MenuQuit:
+                ; TRY TO SAVE FILES
+ .save:         call    SaveMainFiles
+                or      eax, eax
+                jz      .L1
+                stdcall ShowError, LevSaveErrMsg, exitsave_question, MB_YESNOCANCEL
+                switch  eax, IDYES, .save, \
+                             IDNO, .L1, \
+                             IDCANCEL, MenuSelect
+                jmp     MenuSelect
+                ; Выбрали Cancel - выход без записи
+ .L1:           mov     esi,GameTitle
+                mov     edi,BLACK_SCREEN
+                call    SlideDown
+                call    DoneProc
+                invoke  ExitProcess, 0
+endp
+
+proc            DoneProc
+                invoke  KillTimer, [MainWindow], 1
+                stdcall DeleteScreen
+                stdcall DeleteMainWindow
+                ret
+endp
+
+                ; Процедура читает файл с уровнями
+                ; IN    ---
+                ; OUT   прочитанный файл уровней, в [resaddr] адрес области памяти с уровнями
+                ; REMARK
+                ;       в процессе чтения могут произойти ошибки, в этом случае предлагаем
+                ;       очистить все уровни или же восстановить их в оригинальном виде из архива внутри exe файла
+proc            LoadMainFiles
+                mov     [resaddr], _Resource
+                mov     [reschanged], FALSE
+                ;
+ .load:         stdcall LoadFile, ResourceFile, _Resource, RESOURCE_AREA_SIZE
+                jnc     .L0
+                stdcall ShowError, LevLoadErrMsg, load_question, MB_YESNOCANCEL
+                switch  eax, IDYES, .load, \
+                             IDNO, .exit, \
+                             IDCANCEL, .extractoriginal
+ .exit:         invoke  ExitProcess, 0
+
+ .L0:           stdcall CheckResourceCRC
+                jnc     .L1
+                CLEARERROR
+                stdcall ShowError, LevCRCErrMsg, crc_question, MB_YESNO
+                switch  eax, IDYES, .extractoriginal, \
+                             IDNO, .exit
+                jmp     .exit
+ .extractoriginal:
+                ; Извлекаем из внутреннего архива оригинальные уровни (на момент компиляции игры)
+                mov     esi, ResourceOriginal
+                mov     edi, _Resource
+                mov     [resaddr], edi
+                mov     [reschanged], FALSE
+                mov     ecx, [esi + ResourceMainHeader.size]
+                rep     movsb                
+ .L1:           ret
+endp
+
+                ; Процедура записывает файл уровней
+                ; IN    ---
+                ; OUT   eax = 0, save is OK
+                ;       eax =-1, save is failed (error information in error structure)
+proc            SaveMainFiles
+                be      [reschanged], FALSE, .ok        ; Если ресурс не изменялся, смысл его записывать?
+
+                mov     eax, [resaddr]
+                stdcall SaveFile, ResourceFile, eax, [eax+ResourceMainHeader.size]
+                jnc     .ok
+                mov     eax, -1                         ; Сигнализируем об ошибке
+                ret
+
+ .ok:           mov     [reschanged], FALSE             ; Ресурс записан, и не менялся более
+                xor     eax, eax                        ; Всё в порядке
+                ret
+endp
+
+                ;
+                ; Вернуть номер текущего лабиринта
+                ;
+                ; OUT   edi = current level index
+                ;
+proc            GetLevelIndex
+                mov     edi,[Level]
+                ret
+endp
+
+                ;
+                ; Вернуть номер текущего прохождения
+                ;
+                ; OUT   edi = current solve index
+                ;
+proc            GetDemoIndex
+                mov     edi,[Level]
+                add     edi,MAX_RESOURCES
+                ret
+endp
+
+proc            InstallKeyboard
+                mov     edi, ScanKeyboardMap
+                mov     ecx, 256/4
+                xor     eax, eax
+                rep     stosd
+;                push    es
+;                mov     ax,3509h
+;                int     21h
+;                mov     word [OldInt09],bx
+;                mov     word [OldInt09+2],es
+;                pop     es
+;                mov     ax,2509h
+;                mov     dx,NewInt09
+;                int     21h
+                ret
+endp
+
+;;NewInt09:       push    ax bx
+;;                in      al,60h
+;;                mov     bl,al
+;;                and     bx,7Fh
+;;                mov     ah,TRUE
+;;                or      al,al
+;;                jns     .L1
+;;                mov     ah,FALSE
+;; .L1:           mov     [cs:ScanMap+bx],ah
+;;                pop     bx ax
+;;                jmp     [cs:OldInt09]
+
+;;GrabKeyCode:    push    si cx
+;;                mov     si,.keys
+;;                mov     cx,.size
+;;                call    CheckPressed
+;;                pop     cx si
+;;                ret
+;; .keys:         DB      VK_LEFT,VK_RIGHT,VK_UP,VK_DOWN,VK_ESC,VK_DEL
+;; .size          =       $- .keys
+;;
+;;GrabKeyCode2:   push    si cx
+;;                mov     si,.keys
+;;                mov     cx,.size
+;;                call    CheckPressed
+;;                pop     cx si
+;;                ret
+;; .keys:         DB      VK_ENTER,VK_0,VK_1,VK_2,VK_3,VK_4,VK_5,VK_6,VK_7
+;; .size          =       $- .keys
+;;                
+;;CheckPressed:   push    bx
+;; .L1:           lodsb
+;;                mov     bl,al
+;;                mov     bh,0
+;;                be      [ScanMap+bx],TRUE,.Pressed
+;;                loop    .L1
+;;                mov     ax,0
+;;                pop     bx
+;;                ret
+;; .Pressed:      mov     ah,al
+;;                mov     al,0
+;;                pop     bx
+;;                ret
+
+;                ; ECX=количество циклов задержки
+;                ; в DOS, опираемся на изменение счётчика по адресу 0040:006C, который 
+;                ; увеличивается на 1 каждые 18,2 раза в секунду, т.е. каждые 1000/18,2=54,95 мс
+;                ; Округлим это значение до 55.
+;proc            MakeDelay
+;                pushad
+;                stdcall ProcessMessages, PM_EXIT_BY_TIMER, ecx
+;                popad
+;                ret
+;              
+;                if      DEMOFAST = TRUE
+;                 bne     [GameMode],MODE_DEMO,.L0
+;                 push   dx
+;                 mov    dx,20
+; .L2:            push   cx
+;                 mov    cx,0FFFFh
+;                 loopd  $
+;                 pop    cx
+;                 dec    dx
+;                 jnz    .L2
+;                 pop    dx
+;                 ret
+;                end if
+; .L0:           push    es eax bx
+;                mov     ax,040h
+;                mov     es,ax
+;                mov     eax,[es:6Ch]
+; .L1:           call    ClearKbd
+;                cmp     eax,[es:6Ch]
+;                je      .L1
+;                pop     bx eax es
+;                loop    MakeDelay
+;                ret
+;endp
+
+;;ClearKbd:       push    es ax
+;;                mov     ax,40h
+;;                mov     es,ax
+;;                mov     ax,[es:1Ah]
+;;                mov     [es:1Ch],ax
+;;                pop     ax es
+;;                ret
+
+proc            BeepBolder
+                pushad  
+;;                pushad
+;;                mov     al,0B6h
+;;                out     043h,al
+;;                mov     ax,002BCh               ; 1 193 180 (опорная частота таймера) / 02BCh = 1704 Гц
+;;                out     042h,al                 ; Т.о., число для записи в порт 42h 
+;;                mov     al,ah                   ; = опорная частота / нужная частота в Гц
+;;                out     042h,al
+;;                in      al,061h                 ; Включить динамик
+;;                or      al,003h
+;;                out     061h,al
+;;                mov     cx,0A000h
+;;                loop    $
+;;                in      al,061h                 ; Выключить динамик
+;;                and     al,0FCh
+;;                out     061h,al
+;;                mov     al,0B6h
+;;                out     43h,al
+;;                mov     al,0
+;;                out     42h,al
+;;                out     42h,al
+;;                mov     cx,0A000h
+;;                loop    $
+                popad
+                ret
+endp
+
+;;
+;;WaitVSync:      push    dx ax
+;;                mov     dx,3DAh
+;; .L1:           in      al,dx
+;;                test    al,8
+;;                jnz     .L1
+;; .L2:           in      al,dx
+;;                test    al,8
+;;                jz      .L1
+;;                pop     ax dx
+;;                ret
+;;
+                ; Подготовить шрифт
+proc            PrepareFont
+                assert  sizeof.scrinfo.fontdata2 = 256*14
+                mov     esi,fontdata
+                mov     edi,scr.fontdata2
+                mov     ecx,128
+                ; Шрифт увеличивается с 8 строк до 14 строк:
+                ; 01234567 -> 01122334455667
+ .M1:           movsb
+                mov     dl,6
+ .M2:           lodsb
+                stosb
+                stosb
+                dec     dl
+                jnz     .M2
+                movsb
+                loop    .M1
+                ; Оставшиеся 128 символов заполнить нулями
+                mov     ecx, 128 * 14 / 4
+                xor     eax, eax
+                rep     stosd
+                ret
+endp
+
+proc            SetVideoModes
+                mov     [scr.enable], 0         ; disable paint
+                call    CreateMainWindow
+                stdcall CreateScreen, SCREEN_WIDTH, SCREEN_HEIGHT
+                invoke  SetTimer, [MainWindow], 1, DELAY, NULL        ; Включаем таймер
+                ret
+endp
+
+;;SetVideoModes:  ; SETUP 80x28 CELLS MODE
+;;                mov     ax,1202h        ; set up 400 scan lines
+;;                mov     bl,30h
+;;                int     10h
+;;                mov     ax,0003h        ; set up normal text mode
+;;                int     10h
+;;                mov     ax,1111h        ; load ega character set
+;;                mov     bl,00h
+;;                int     10h
+;;                ;
+;;                call    PrepareFont
+;;                mov     ax,1110h        ; ah=11h      EGA character generator functions
+;;                                        ; al=10h      load user-defined text-mode display font
+;;                mov     bh,14           ; bh=14       количество байт на один символ (8 или 14)
+;;                mov     bl,0            ; bl=0        номер блока символов (от 0 до 4)
+;;                mov     cx,128          ; cx=128      количество программируемых символов
+;;                mov     dx,128          ; dx=128      код начального символа
+;;                mov     bp,fontdata2    ; bp          адрес битовой маски символов
+;;                int     10h
+;;                mov     ah,1
+;;                mov     cx,2020h
+;;                int     10h
+;;                ; Для стабилизации изображения на некоторых мониторах...
+;;                ; Philips 105MB, например...
+;;                mov     cx,25
+;;                call    MakeDelay
+;;                ret
+;;
+
+                ;
+                ; DH=y, DL=x, AH=attr, AL=char_code
+                ;
+proc            DrawCharBolder uses edx esi
+                movzx   esi, dh                 ; addr = DH * 160 + DL * 2
+                imul    esi, 160
+                movzx   edx, dl
+                lea     esi, [esi + edx*2]
+                mov     [scr.screen + esi], ax
+;                pushad
+;                invoke  InvalidateRect, [MainWindow], NULL, FALSE
+;                call    UpdateScreen
+;                popad
+                ret
+endp
+
+macro           CHG_COORD       reg, mem
+{
+                local   .done, .setmem
+                be      al, _IGN, .done
+                be      al, _MEM, .setmem
+                mov     reg, al
+                jmp     .done
+ .setmem:       mov     reg, mem
+ .done:
+}
+
+proc            DrawTextBolder uses   eax edx esi
+                push    dword -1
+ .Loop:         lodsb
+                be      al,_END,.endtxt
+                be      al,_XY,.xy
+                be      al,_ATTR,.attr
+                be      al,_SUBSTR,.subs
+                call    DrawCharBolder
+                inc     dl
+                jmp     .Loop
+                ;
+ .xy:           mov     al,[esi]        ; read X
+                inc     esi
+                CHG_COORD  dl, [MenuMemX]
+                mov     al,[esi]        ; read Y
+                inc     esi
+                CHG_COORD  dh, [MenuMemY]
+                jmp     .Loop
+                ;
+ .attr:         mov     ah,[esi]
+                inc     esi
+                jmp     .Loop
+                ;
+ .subs:         inc     esi
+                push    esi
+                movzx   esi, byte [esi-1]
+                mov     esi, [SubStringAddr + esi*4]
+                jmp     .Loop
+                ;
+ .endtxt:       pop     esi
+                bne     esi, -1, .Loop
+                ret
+endp
+
+macro           COPYDG  froma, toa, number
+{
+                local   .L1
+                mov     esi, froma
+                mov     edi, toa
+                mov     ecx, number
+ .L1:           lodsb
+                add     al, '0'
+                stosb
+                loop    .L1
+                mov     al, _END
+                stosb
+}
+
+                ; show "LEVEL: xxx" information
+proc            LEV_INFO
+                mov     edx,[Level]
+                inc     edx
+                call    RAS
+                COPYDG  ED+ED.size-3, _levno, 3
+                mov     esi,LEVTXT
+                call    DrawTextBolder
+                ret
+endp
+
+proc            SCO_INFO
+                mov     edx,[OBK]
+                call    RAS
+                COPYDG  ED+ED.size-5, _scores, 5
+                mov     esi,SCOTXT
+                call    DrawTextBolder
+                ret
+endp
+
+proc            POP_INFO
+                movzx   edx,[Popitk]
+                call    RAS
+                COPYDG  ED+ED.size-2, _lives, 2
+                mov     esi,POPTXT
+                call    DrawTextBolder
+                ret
+endp
+
+proc            ClearStatusBar
+                mov     [GameMode],MODE_MENU
+                call    DrawStatusBar
+                ret
+endp
+
+; MODE_MENU     =  "                      BY YSOFT LAB., 1991"
+; MODE_PLAY     =  "LEVEL: 001     LIVES: 05     SCORE: 00000"
+; MODE_VIEW     =  "LEVEL: 001                    SELECT MODE"
+; MODE_VIDA     =  "LEVEL: 001   DEMO AVAILABLE   SELECT MODE"
+; MODE_EDIT     =  "LEVEL: 001                      EDIT MODE"
+; MODE_TEST     =  "LEVEL: 001                      TEST MODE"
+; MODE_DEMO     =  "LEVEL: 001                      DEMO MODE"
+proc            DrawStatusBar
+                mov     eax, 0F20h              ; Очищаем строку для информации
+                lea     edi, [scr.screen + 1*160 + 23*2]
+                mov     ecx, 50
+                rep     stosw
+                ;
+                mov     eax,[GameMode]          ; Показываем статусную строку 
+                be      eax,MODE_MENU,.Menu     ; в зависимости от текущего режима
+                be      eax,MODE_PLAY,.Play
+                be      eax,MODE_VIEW,.View
+                be      eax,MODE_VIDA,.ViDa
+                be      eax,MODE_EDIT,.Edit
+                be      eax,MODE_TEST,.Test
+                be      eax,MODE_DEMO,.Demo
+                ret
+                ;
+ .ViDa:         mov     esi,DEMOAVAILTXT        ; "demo available"
+                call    DrawTextBolder
+ .View:         call    LEV_INFO
+                mov     esi,SELTXT              ; "select mode"
+                call    DrawTextBolder
+                ret
+                ;
+ .Edit:         call    LEV_INFO
+                mov     esi,EDTTXT
+                call    DrawTextBolder
+                ret
+                ;
+ .Test:         call    LEV_INFO
+                mov     esi,TSTTXT
+                call    DrawTextBolder
+                ret
+                ;
+ .Play:         call    LEV_INFO
+                call    POP_INFO
+                call    SCO_INFO
+                ret
+                ;
+ .Demo:         call    LEV_INFO
+                mov     esi,DMOTXT
+                call    DrawTextBolder
+                ret
+                ;
+ .Menu:         mov     esi,COPYR_TXT
+                call    DrawTextBolder
+                ret
+endp
+
+;;
+;;MakeSoundEffects:
+;;                mov     cx,[SoundsCount]
+;;                jcxz    .LE
+;; .L3:           call    SOO
+;;                loop    .L3
+;; .LE:           ret
+;;
+
+                ; Draw frame 66 * 26 (permanent stay on the screen)
+proc            DrawFrameBolder
+                mov     ax, 0917h                       ; Символ - квадрат размером в знакоместо
+                lea     edi, [scr.screen + 2*160 + 7*2] ; Левый верхний угол рамки
+                mov     ecx, 66
+ .L1:           mov     [edi], ax
+                mov     [edi + 25*160], ax
+                add     edi, 2
+                loop    .L1
+                ;
+                lea     edi, [scr.screen + 3*160 + 7*2]
+                mov     ecx, 24
+ .L2:           mov     [edi], ax
+                mov     [edi + 65*2], ax
+                add     edi, 160
+                loop    .L2
+                ;
+                mov     esi,TXTVR
+                call    DrawTextBolder
+                ret
+endp
+
+                ; Компрессия уровня
+proc            CompressLevel
+                ; Временно сохраняем уровень
+                mov     esi,Maze
+                mov     edi,tmp_level_data
+                mov     ecx,MAZE_WIDTH*MAZE_HEIGHT/4
+                rep     movsd
+                ; Извлекаем уровень из архива
+                call    ExpandLevel
+                ; Сравниваем два уровня на одинаковость
+                mov     esi,Maze
+                mov     edi,tmp_level_data
+                mov     ecx,MAZE_WIDTH*MAZE_HEIGHT/4
+                rep     cmpsd
+                je      .Done
+                ; Копируем уровень обратно в Maze
+                mov     esi,tmp_level_data
+                mov     edi,Maze
+                mov     ecx,MAZE_WIDTH*MAZE_HEIGHT/4
+                rep     movsd
+                ; И "сжимаем" Maze -> tmp_level_data
+                mov     esi,Maze
+                mov     edi,tmp_level_data
+                ;
+                xor     ebx, ebx
+                mov     cl, 0                   ; bits in buffer
+                ;
+ .Loop:         movzx   eax, byte [esi]
+                inc     esi
+                shl     eax, cl
+                or      ebx, eax
+                add     cl, 3
+                cmp     cl, 8                   ; flush full byte
+                jb      .L1
+                mov     [edi], bl
+                inc     edi
+                shr     ebx, 8
+                sub     cl, 8
+ .L1:           bb      esi, Maze+MAZE_WIDTH*MAZE_HEIGHT, .Loop
+                ; flush bits not need, 16*12=192 bytes = *3 = 576 bits = /8 = 72 bytes
+                ;
+                sub     edi, tmp_level_data
+                mov     ecx, edi
+                call    GetLevelIndex
+                call    ReplaceResource         ; Новый уровень
+                call    GetDemoIndex
+                mov     cx,0
+                call    ReplaceResource         ; Удалить демо
+ .save:         call    SaveMainFiles
+                ; В регистре eax = 0, запись успешна; eax = -1 нет
+                or      eax, eax
+                jz      .Done
+                ; Обрабатываем ошибку
+                stdcall ShowError, LevSaveErrMsg, editorsave_question, MB_YESNO
+                switch  eax, IDYES, .save
+ .Done:         ret
+endp
+
+                ; Расшифровка лабиринта
+proc            ExpandLevel
+                pushad
+                call    GetLevelIndex
+                call    GetResourcePtr
+                lea     eax, [esi + sizeof.ResourceDataHeader]
+                call    BitsInit
+                mov     edi, Maze
+                mov     ecx, 16 * 12
+ .Loop:         mov     dl, 3
+                call    BitsGet
+                stosb
+                loop    .Loop
+                ;
+                mov     ecx,MAZE_WIDTH
+                mov     al,7                            ; Внизу - бетон - непробиваемый ничем (ранее было 4)
+                rep     stosb
+                popad
+                ret
+endp
+
+                ;
+                ; Рисуем лабиринт
+                ; mazeAddr=адрес лабиринта (если 0, то рисуем с адреса Maze)
+                ; 
+proc            DrawLevel       mazeAddr:DWORD
+                pushad
+                mov     esi, [mazeAddr]
+                default esi, Maze
+                mov     edi, scr.screen + 3*160+8*2
+                mov     ch,12
+ .LoopY:        mov     cl,16
+                push    edi
+ .LoopX:        lodsb
+                push    esi
+                movzx   esi,al
+                imul    esi,9
+                add     esi,SPRT
+                mov     ah,[esi]         ; Цвет
+                inc     esi
+            repeat 4
+                lodsb
+                stosw
+            end repeat
+                add     edi,160-4*2
+            repeat 4
+                lodsb
+                stosw
+            end repeat
+                sub     edi,160
+                pop     esi
+                loopr   cl, .LoopX
+                pop     edi
+                add     edi,160*2
+                loopr   ch, .LoopY
+                call    DrawStatusBar
+                popad
+                ret
+endp
+
+;;
+;;                ; ОБРАБОТКА ЛАБИРИНТА!!!
+;;SKA:            mov     [PSK],0         ; Флаг движения
+;;                mov     [PlayerDie],FALSE
+;;                mov     [SoundsCount],0 ; Кол-во звуковых эффектов
+;;                mov     si,Maze+191     ; HL = Maze+191, DE = Maze+191 + 16
+;;                mov     bh,MAZE_WIDTH   ; B
+;;                mov     bl,MAZE_HEIGHT  ; C
+;;SKNXT:          mov     al,[si]
+;;                cmp     al,41
+;;                ja      SR12
+;;                movzx   di,al
+;;                add     di,di
+;;                jmp     [di+SwitchTable]
+;;SwitchTable     dw      SR12    ; 00 =Пустота
+;;                dw      SM1     ; 01 =Камень - падает, скатывается
+;;                dw      SM2     ; 02 =Алмаз - падает, скатывается
+;;                dw      SR12    ; 03 =Песок
+;;                dw      SR12    ; 04 =Стены
+;;                dw      UPR     ; 05 =Человечек - передвигается
+;;                dw      SM6     ; 06
+;;                dw      SR12    ; 07
+;;                dw      SM8     ; 08
+;;                dw      SR12    ; 09
+;;                dw      SR12    ; 10
+;;                dw      SM11    ; 11
+;;                dw      SR12    ; 12
+;;                dw      SR12    ; 13
+;;                dw      SR12    ; 14
+;;                dw      SR12    ; 15
+;;                dw      SM16    ; 16
+;;                dw      UPR     ; 17
+;;                dw      SR12    ; 18
+;;                dw      SM19    ; 19
+;;                dw      SM20    ; 20
+;;                dw      SM21    ; 21
+;;                dw      SR12    ; 22
+;;                dw      SM23    ; 23
+;;                dw      UPR     ; 24
+;;                dw      SR12    ; 25
+;;                dw      SM26    ; 26
+;;                dw      UPR     ; 27
+;;                dw      SM28    ; 28
+;;                dw      SM29    ; 29
+;;                dw      SM30    ; 30
+;;                dw      SR12    ; 31
+;;                dw      SR12    ; 32
+;;                dw      SM33    ; 33
+;;                dw      SM34    ; 34
+;;                dw      SR12    ; 35
+;;                dw      SM36    ; 36
+;;                dw      SM37    ; 37
+;;                dw      SM38    ; 38
+;;                dw      SM39    ; 39
+;;                dw      SM40    ; 40
+;;                dw      SM41    ; 41
+;;SR12:           dec     si   
+;;SR14:           dec     bh   
+;;                jnz     SKNXT
+;;                mov     bh,16
+;;                dec     bl
+;;                jnz     SKNXT
+;;                call    MakeSoundEffects
+;;                call    DrawLevel
+;;                ret
+;;
+;;SM8:            mov     byte [si],2
+;;                jmp     SR12
+;;
+;;SM1:            bne     byte [si+16],0,SR0      ; КАМЕНЬ: Можем упасть?
+;;                mov     byte [si],16            ; КАМЕНЬ: Падаем вниз...
+;;                mov     byte [si+16],15
+;;                jmp     SR124
+;;
+;;SR0:            inc     si                      ; КАМЕНЬ: Скатиться вправо?
+;;                be      bh,16,SR1
+;;                mov     al,[si]
+;;                or      al,[si+16]
+;;                jnz     SR1
+;;                mov     byte [si],1             ; КАМЕНЬ: Катимся вправо...
+;;                dec     si
+;;                mov     byte [si],0
+;;                jmp     SR124
+;;
+;;SR1:            dec     si                      ; КАМЕНЬ: Скатиться влево?
+;;                dec     si
+;;                be      bh,1,SR14
+;;                mov     al,[si]
+;;                or      al,[si+16]
+;;                jnz     SR14
+;;                mov     byte [si],1             ; КАМЕНЬ: Катимся влево...
+;;                inc     si
+;;                mov     byte [si],0
+;;                dec     si
+;;                dec     bh
+;;                jmp     SR124
+;;                
+;;SM2:            bne     byte [si+16],0,SR2      ; АЛМАЗ: Может упасть?
+;;                mov     byte [si],11            ; АЛМАЗ: Падает вниз...
+;;                mov     byte [si+16],10
+;;                jmp     SR124
+;;
+;;SR2:            inc     si                      ; АЛМАЗ: Скатиться вправо?
+;;                be      bh,16,SR3
+;;                mov     al,[si]
+;;                or      al,[si+16]
+;;                jnz     SR3
+;;                mov     byte [si],2             ; АЛМАЗ: Катимся вправо...
+;;                dec     si
+;;                mov     byte [si],0
+;;                jmp     SR124
+;;
+;;SR3:            dec     si                      ; АЛМАЗ: Скатиться влево?
+;;                dec     si
+;;                be      bh,1,SR14
+;;                mov     al,[si]
+;;                or      al,[si+16]
+;;                jnz     SR14
+;;                mov     byte [si],2             ; АЛМАЗ: Катимся влево...
+;;                inc     si
+;;                mov     byte [si],0
+;;                dec     si
+;;                dec     bh
+;;                jmp     SR124
+;;
+;;SR124:          mov     [PSK],1                 ; Хоть что-то двинулось...
+;;                jmp     SR12
+;;
+;;SM11:           mov     byte [si],0             ; АЛМАЗ: Падение закончилось
+;;                mov     byte [si+16],2
+;;                call    BSL                     ; Проверка - кого прибили...
+;;                jmp     SR124
+;;
+;;SM16:           mov     byte [si],0
+;;                mov     byte [si+16],1
+;;                call    BSL
+;;                jmp     SR124
+;;
+;;SM19:           mov     byte [si],0
+;;                mov     byte [si+16],17
+;;                jmp     SR12
+;;
+;;SM20:           mov     byte [si],17
+;;                mov     byte [si+16],0
+;;                jmp     SR12
+;;
+;;SM21:           mov     byte [si],20            ; меняем 21 на 20, так как
+;;                jmp     SR12                    ; проход по уровню идет снизу
+;;                                                ; вверх, и если сразу поставить
+;;                                                ; 20 то человечек будет бежать
+;;                                                ; вверх со скоростью света.
+;;
+;;SM23:           mov     byte [si],24
+;;                dec     si
+;;                mov     byte [si],0
+;;                inc     si
+;;                jmp     SR12
+;;
+;;SM26:           mov     byte [si],0
+;;                dec     si
+;;                mov     byte [si],27
+;;                dec     bh
+;;                jmp     SR12
+;;
+;;SM29:           mov     byte [si],28
+;;                dec     si
+;;                mov     byte [si],0
+;;                inc     si
+;;                jmp     SR12
+;;
+;;SM30:           mov     byte [si],0
+;;                dec     si
+;;                mov     byte [si],28
+;;                dec     bh
+;;                jmp     SR12
+;;
+;;SM33:           mov     byte [si],0
+;;                mov     byte [si+16],28
+;;                jmp     SR12
+;;
+;;SM34:           mov     byte [si],28
+;;                mov     byte [si+16],0
+;;                jmp     SR12
+;;
+;;SM40:           mov     byte [si],34
+;;                jmp     SR12
+;;
+;;SM36:           mov     byte [si],6
+;;                dec     si
+;;                mov     byte [si],0
+;;                inc     si
+;;                jmp     SR12
+;;
+;;SM37:           mov     byte [si],0
+;;                dec     si
+;;                mov     byte [si],6
+;;                dec     bh
+;;                jmp     SR12
+;;
+;;SM38:           mov     byte [si],0
+;;                mov     byte [si+16],6
+;;                jmp     SR12
+;;
+;;SM39:           mov     byte [si],6
+;;                mov     byte [si+16],0
+;;                jmp     SR12
+;;
+;;SM41:           mov     byte [si],39
+;;                jmp     SR12
+;;
+;;UPR:            mov     [KOORD],si              ; Координаты человека
+;;                push    si
+;;                mov     ax,[KOD]
+;;                be      ah,VK_LEFT,U1L
+;;                be      ah,VK_RIGHT,U1R
+;;                be      ah,VK_UP,U1U
+;;                be      ah,VK_DOWN,U1D
+;;                be      ah,VK_DEL,SELFDES       ; Self-destruct
+;;                pop     si
+;;                mov     byte [si],5
+;;                jmp     SR12
+;;
+;;SELFDES:        push    bx
+;;                sub     si,17                   ; Самоуничтожение
+;;                dec     bl
+;;                dec     bh
+;;                call    UBR1
+;;                pop     bx
+;;                pop     si
+;;                jmp     SR12
+;;
+;;U1L:            mov     [KOD],VK_LEFT SHL 8     ; ЧЕЛОВЕЧЕК: Влево
+;;                mov     dx,-1
+;;                call    DWR
+;;                mov     byte [si],26
+;;                dec     si
+;;                mov     byte [si],25
+;;                pop     si
+;;                dec     si
+;;                dec     bh
+;;                jmp     SR12
+;;
+;;U1R:            mov     [KOD],VK_RIGHT SHL 8    ; ЧЕЛОВЕЧЕК: Вправо
+;;                mov     dx,1
+;;                call    DWR
+;;                mov     byte [si],22
+;;                inc     si
+;;                mov     byte [si],23
+;;                pop     si
+;;                jmp     SR12
+;;
+;;U1U:            mov     [KOD],VK_UP SHL 8       ; ЧЕЛОВЕЧЕК: Вверх
+;;                mov     dx,-16
+;;                call    DWR
+;;                int3
+;;                mov     byte [si-16],21
+;;                mov     byte [si],18
+;;                pop     si
+;;                jmp     SR12
+;;
+;;U1D:            mov     [KOD],VK_DOWN SHL 8     ; ЧЕЛОВЕЧЕК: Вниз
+;;                mov     dx,16
+;;                call    DWR
+;;                mov     byte [si],19
+;;                mov     byte [si+16],18
+;;                pop     si
+;;                jmp     SR12
+;;
+;;DWR:            push    si
+;;                push    bx
+;;                call    PROW
+;;                add     si,dx
+;;                mov     al,[si]
+;;                be      al,2,ZWK
+;;                be      al,1,SDW
+;;                be      al,3,UED
+;;                be      al,0,UED
+;;                pop     bx
+;;                pop     si
+;;                pop     ax              ; Адрес возврата
+;;                pop     si
+;;                jmp     SR12
+;;
+;;ZWK:            inc     [SoundsCount];call    SOO
+;;                dec     [KLW]
+;;                add     [OBK],SCORE_TREASURE
+;;UED:            pop     bx
+;;                pop     si
+;;                ret
+;;
+;;SDW:            call    PROW            ; СДВИГ КАМНЕЙ!!!
+;;                add     si,dx
+;;                mov     al,[si]
+;;                be      al,1,SDW
+;;                be      al,0,UEDO
+;;                pop     bx
+;;                pop     si
+;;                pop     ax              ; Адрес возврата
+;;                pop     si
+;;                jmp     SR12
+;;
+;;                ; Проверка на пределы уровня
+;;PROW:           mov     ax,[KOD]
+;;                be      ah,VK_LEFT,R1L
+;;                be      ah,VK_RIGHT,R1R
+;;                be      ah,VK_UP,R1U
+;;                be      ah,VK_DOWN,R1D
+;;                ret
+;;R1L:            dec     bh
+;;                jz      EP2
+;;                ret
+;;R1R:            inc     bh
+;;                be      bh,17,EP2
+;;                ret
+;;R1U:            dec     bl
+;;                jz      EP2
+;;                ret
+;;R1D:            inc     bl
+;;                be      bl,13,EP2
+;;                ret
+;;EP2:            pop     ax              ; Адрес возврата
+;;                pop     bx
+;;                pop     si
+;;                pop     ax              ; Адрес возврата
+;;                pop     si
+;;                jmp     SR12
+;;
+;;UEDO:           mov     byte [si],1
+;;                pop     bx
+;;                pop     si
+;;                ret
+;;
+;;                ; Проверка: грохнул ли кого камень?
+;;BSL:            mov     al,[si+32]
+;;                be      al,5,UB2
+;;                be      al,17,UB2
+;;                be      al,24,UB2
+;;                be      al,27,UB2
+;;                be      al,6,UB2
+;;                be      al,28,UB2
+;;                bne     al,0,.L1
+;;                ret
+;; .L1:           cmp     al,5
+;;                jc      ZW
+;;                ret
+;;ZW:             inc     [SoundsCount];call    SOO
+;;                ret
+;;
+;;UB2:            push    bx
+;;                push    si
+;;                add     si,15
+;;                dec     bh
+;;                inc     bl
+;;                call    UBR1
+;;                pop     si
+;;                pop     bx
+;;                ret
+;;
+;;                ; ВЗРЫВ!!!
+;;UBR1:           inc     [SoundsCount];call    SOO
+;;TRM:            call    PKR
+;;                inc     si
+;;                inc     bh
+;;                call    PKR
+;;                inc     si
+;;                inc     bh
+;;                call    PKR
+;;                add     si,16
+;;                inc     bl
+;;                call    PKR
+;;                dec     si
+;;                dec     bh
+;;                call    PKR
+;;                dec     si
+;;                dec     bh
+;;                call    PKR
+;;                add     si,16
+;;                inc     bl
+;;                call    PKR
+;;                inc     si
+;;                inc     bh
+;;                call    PKR
+;;                inc     si
+;;                inc     bh
+;;                call    PKR
+;;                inc     [SoundsCount];call    SOO
+;;                ret
+;;
+;;PKR:            be      bh,17,.Ex
+;;                be      bh,0,.Ex
+;;                be      bl,13,.Ex
+;;                be      bl,0,.Ex
+;;                mov     al,[si]
+;;                be      al,7,.Ex                ; бетон непробиваем
+;;                cmp     al,29
+;;                jnc     .Ex
+;;                be      al,28,ZP
+;;                be      al,2,.Ex                ; уже алмаз
+;;                be      al,5,PP                 ; человечек - взрывается
+;;                cmp     al,17
+;;                jnc     PP
+;;                cmp     al,7
+;;                jnc     .Ex
+;;                jmp     ZP
+;; .Ex:           ret
+;;ZP:             mov     byte [si],2
+;;                inc     [KLW]
+;;                ret
+;;PP:             mov     [PlayerDie],TRUE        ; ЧЕЛОВЕЧЕК Прихлопнут :(
+;;                jmp     ZP
+;;
+;;SM6:            push    bx
+;;                push    si
+;;                cmp     si,[KOORD]
+;;                jc      MM0_
+;;SE1:            dec     si
+;;                dec     bh
+;;                be      bh,0,SE2
+;;                mov     al,[si]
+;;                cmp     al,28
+;;                jnc     SE2
+;;                be      al,5,UBR2
+;;                cmp     al,17
+;;                jnc     UBR2
+;;                bne     al,0,SE2
+;;                mov     byte [si],31
+;;                inc     si
+;;                mov     byte [si],37
+;;                pop     si
+;;                dec     si
+;;                pop     bx
+;;                dec     bh
+;;                jmp     SR12
+;;SE2:            sub     si,15
+;;                inc     bh
+;;                dec     bl
+;;                be      bl,0,E5_
+;;                mov     al,[si]
+;;                cmp     al,28
+;;                jnc     E5_
+;;                be      al,5,UBR2
+;;                cmp     al,17
+;;                jnc     UBR2
+;;                bne     al,0,E5_
+;;                mov     byte [si],41
+;;                pop     si
+;;                mov     byte [si],32
+;;                pop     bx
+;;                jmp     SR12
+;;E5_:            pop     si
+;;                pop     bx
+;;                mov     byte [si],28
+;;                jmp     SR12
+;;MM0_:           inc     si
+;;                inc     bh
+;;                be      bh,17,SQ0
+;;                mov     al,[si]
+;;                cmp     al,28
+;;                jnc     SQ0
+;;                be      al,5,UBR2
+;;                cmp     al,17
+;;                jnc     UBR2
+;;                bne     al,0,SQ0
+;;                mov     byte [si],36
+;;                pop     si
+;;                mov     byte [si],31
+;;                pop     bx
+;;                jmp     SR12
+;;SQ0:            add     si,15
+;;                dec     bh
+;;                inc     bl
+;;                be      bl,13,E6_
+;;                mov     al,[si]
+;;                cmp     al,28
+;;                jnc     E6_
+;;                be      al,5,UBR2
+;;                cmp     al,17
+;;                jnc     UBR2
+;;                bne     al,0,E6_
+;;                mov     byte [si],32
+;;                pop     si
+;;                mov     byte [si],38
+;;                pop     bx
+;;                jmp     SR12
+;;E6_:            pop     si
+;;                pop     bx
+;;                mov     byte [si],28
+;;                jmp     SR12
+;;
+;;SM28:           push    bx
+;;                push    si
+;;                cmp     si,[KOORD]
+;;                jnc     MM1_
+;;SE3:            dec     si
+;;                dec     bh
+;;                be      bh,0,SE4
+;;                mov     al,[si]
+;;                cmp     al,28
+;;                jnc     SE4
+;;                be      al,5,UBR2
+;;                cmp     al,17
+;;                jnc     UBR2
+;;                bne     al,0,SE4
+;;                mov     byte [si],31
+;;                pop     si
+;;                mov     byte [si],30
+;;                dec     si
+;;                pop     bx
+;;                dec     bh
+;;                jmp     SR12
+;;SE4:            sub     si,15
+;;                inc     bh
+;;                dec     bl
+;;                be      bl,0,E7_
+;;                mov     al,[si]
+;;                cmp     al,28
+;;                jnc     E7_
+;;                be      al,5,UBR2
+;;                cmp     al,17
+;;                jnc     UBR2
+;;                bne     al,0,E7_
+;;                mov     byte [si],40
+;;                pop     si
+;;                mov     byte [si],32
+;;                pop     bx
+;;                jmp     SR12
+;;E7_:            pop     si
+;;                pop     bx
+;;                mov     byte [si],6
+;;                jmp     SR12
+;;MM1_:           inc     si
+;;                inc     bh
+;;                be      bh,17,SQ1
+;;                mov     al,[si]
+;;                cmp     al,28
+;;                jnc     SQ1
+;;                be      al,5,UBR2
+;;                cmp     al,17
+;;                jnc     UBR2
+;;                bne     al,0,SQ1
+;;                mov     byte [si],29
+;;                pop     si
+;;                mov     byte [si],31
+;;                pop     bx
+;;                jmp     SR12
+;;SQ1:            add     si,15
+;;                dec     bh
+;;                inc     bl
+;;                be      bl,13,E8_
+;;                mov     al,[si]
+;;                cmp     al,28
+;;                jnc     E8_
+;;                be      al,5,UBR2
+;;                cmp     al,17
+;;                jnc     UBR2
+;;                bne     al,0,E8_
+;;                mov     byte [si],32
+;;                pop     si
+;;                mov     byte [si],33
+;;                pop     bx
+;;                jmp     SR12
+;;E8_:            pop     si
+;;                pop     bx
+;;                mov     byte [si],6
+;;                jmp     SR12
+;;
+;;UBR2:           sub     si,17
+;;                dec     bh
+;;                dec     bl
+;;                call    TRM
+;;                pop     si
+;;                pop     bx
+;;                jmp     SR12
+;;;------------------------------------------------------------------------------
+;;
+;;                ; Подсчет количества драгоценностей
+;;KOLWO:          mov     si,Maze
+;;                mov     dx,0
+;;                mov     cx,192
+;; .L1:           bne     byte [si],2,.L2
+;;                inc     dx
+;; .L2:           inc     si
+;;                loop    .L1
+;;                mov     [KLW],dx
+;;                ; Найти координаты человечка и поместить их в KOORD
+;;                mov     di,Maze
+;;                mov     cx,16*12
+;;                mov     al,5
+;;                repne   scasb
+;;                dec     di
+;;                mov     [KOORD],di
+;;                ret
+;;
+;;;=== GAME CYCLE ===============================================================
+;;GAME:           mov     [Level],0               ; Номер уровня
+;;                mov     [Popitk],INIT_LIVES     ; Попыток
+;;                mov     [OBK],INIT_SCORE        ; Очки
+;;                call    NUMW
+;;                mov     si,GameTitle
+;;                mov     di,GameScore
+;;                call    SlideUpAndBeep          ; Заставка => Очки
+;;                mov     [GameMode],MODE_PLAY
+;; .PlayLevel:    mov     cx,15                   ; Пауза
+;;                call    MakeDelay
+;;                mov     si,GameScore
+;;                mov     di,MAZE_SCREEN
+;;                call    SlideUpAndBeep          ; Очки ==> Лабиринт
+;;                call    PlayLoop
+;;                be      ax,GAME_LEVEL_DONE,.L1
+;;                be      ax,GAME_LEVEL_BREAK,.L2
+;;                be      ax,GAME_PLAYER_DIE,.L2
+;;                be      ax,GAME_PLAY_BREAK,.L3
+;; .L2:           call    WaitForSilent
+;;                dec     [Popitk]
+;;                call    DrawStatusBar
+;;                call    NUMW
+;;                mov     si,Maze
+;;                mov     di,GameScore
+;;                call    SlideDownAndBeep
+;;                bne     [Popitk],0,.PlayLevel   ; Переход, если есть попытки
+;;                jmp     .GameOver
+;; .L1:           call    EndLevelSignal
+;;                inc     [Popitk]
+;;                inc     [Level]
+;;                add     [OBK],SCORE_BONUS
+;;                call    DrawStatusBar
+;;                call    NUMW
+;;                mov     si,Maze
+;;                mov     di,GameScore
+;;                call    SlideDownAndBeep
+;;                bne     [Level],MAX_LEVELS,.PlayLevel
+;; .GameOver:     call    BeepBolder              ; ИГРА ОКОНЧЕНА!!!
+;;                mov     [GameMode],MODE_MENU
+;;                jmp     .Title
+;; .L3:           mov     si,Maze
+;;                mov     di,GameScore
+;;                call    SlideDownAndBeep
+;;                call    ClearStatusBar
+;; .Title:        mov     cx,25                   ; Пауза
+;;                call    MakeDelay
+;;                mov     si,GameScore
+;;                mov     di,GameTitle
+;;                call    SlideDownAndBeep
+;; .Done:         ret
+;;;==============================================================================
+;;
+;;;=== TEST CYCLES ==============================================================
+;;TEST1:          mov     [Popitk],0
+;;                mov     [OBK],0
+;;                call    NUMW                    ; Очки никогда не показываются...
+;; .TestLoop:     call    ExpandLevel
+;;                mov     [GameMode],MODE_TEST
+;;                call    PlayLoop
+;;                be      ax,GAME_PLAYER_DIE,.L2
+;;                be      ax,GAME_LEVEL_BREAK,.L2
+;;                be      ax,GAME_LEVEL_DONE,.L1
+;;                be      ax,GAME_PLAY_BREAK,.L1
+;; .L2:           call    WaitForSilent
+;;                mov     si,Maze                 ; Лабиринт => Очки
+;;                mov     di,GameScore
+;;                call    SlideDownAndBeep
+;;                mov     cx,15                   ; Пауза
+;;                call    MakeDelay
+;;                mov     si,GameScore
+;;                mov     di,MAZE_SCREEN
+;;                call    SlideUpAndBeep          ; Очки ==> Лабиринт
+;;                jmp     .TestLoop
+;; .L1:           ret
+;;;==============================================================================
+;;
+;;;=== DEMO CYCLES ==============================================================
+;;DEMO1:          push    [GameMode]
+;;                mov     [GameMode],MODE_DEMO
+;; .DemoLoop:     call    GetDemoIndex            ; Есть данные для демо?
+;;                call    GetResourcePtr
+;;                be      word [si],0,.NextLevel2
+;;                call    InitRecPlay
+;;                mov     si,BLACK_SCREEN
+;;                mov     di,MAZE_SCREEN
+;;                call    SlideUpAndBeep          ; Черный экран -> Лабиринт
+;;                call    PlayLoop                ; >ИГРОВОЙ ЦИКЛ<
+;;                be      ax,GAME_LEVEL_DONE,.NextLevel
+;;                be      ax,GAME_PLAY_BREAK,.DemoEnd
+;;                be      ax,GAME_PLAYER_DIE,.DemoEnd
+;;                be      ax,GAME_LEVEL_BREAK,.DemoEnd
+;; .NextLevel:    mov     si,Maze
+;;                mov     di,BLACK_SCREEN
+;;                call    SlideUp                 ; Лабиринт -> черный экран
+;; .NextLevel2:   mov     ax,[Level]
+;;                inc     ax                      ; Перейти к следующему уровню
+;;                be      ax,MAX_LEVELS,.DemoEnd
+;;                mov     [Level],ax
+;;                jmp     .DemoLoop
+;; .DemoEnd:      pop     [GameMode]
+;;                ret
+;;;==============================================================================
+;;
+;;;=== DEMO THRU ALL LEVELS =====================================================
+;;DEMO_ALL:       mov     [Level],0               ; Начать демонстрацию с начала
+;;                call    DEMO1
+;;                ret
+;;;==============================================================================
+;;
+;;;=== PLAY LOOP ================================================================
+;;PlayLoop:       call    KOLWO                   ; Подсчет алм. и выч.коор.чел.
+;;                call    MazeToMazeWork
+;;                be      [GameMode],MODE_DEMO,.L3
+;;                call    InitRecRec              ; Настройка ЗАПИСИ
+;;                jmp     .GameLoop
+;; .L3:           call    InitRecPlay             ; Настройка ВОСПРОИЗВЕДЕНИЯ
+;; .GameLoop:     be      [GameMode],MODE_DEMO,.L0
+;;                mov     cx,1
+;;                call    MakeDelay
+;; .L0:           be      [KLW],0,.LevelDone
+;;                bne     [GameMode],MODE_DEMO,.L1
+;;                call    GrabKeyCode
+;;                be      ah,VK_ESC,.L2           ; Выход во время демо...
+;;                call    GetRecordedKeyCode
+;;                jmp     .L2
+;; .L1:           call    GrabKeyCode
+;;                call    RecKeyCode
+;; .L2:           mov     [KOD],ax
+;;                be      ah,VK_ESC,.PlayBreak    ; Выход из игры
+;;                call    SKA                     ; ДВИЖЕНИЕ!!!
+;;                bne     [PlayerDie],TRUE,.GameLoop
+;;                be      [KOD],VK_DEL*256,.LevelBreak
+;;                jmp     .PlayerDie
+;; .LevelDone:    be      [GameMode],MODE_DEMO,.L4
+;;                call    RecKeyCodeStop          ; Остановить запись...
+;; .L4:           mov     ax,GAME_LEVEL_DONE      ; УРОВЕНЬ ПРОЙДЕН!!!
+;;                ret
+;; .PlayBreak:    mov     ax,GAME_PLAY_BREAK      ; ВЫХОД ИЗ ИГРЫ!!!
+;;                ret
+;; .LevelBreak:   mov     ax,GAME_LEVEL_BREAK     ; ПЕРЕЗАПУСК УРОВНЯ!!!
+;;                ret
+;; .PlayerDie:    mov     ax,GAME_PLAYER_DIE      ; ЧЕЛОВЕЧКА ПРИБИЛО!!!
+;;                ret
+;;;==============================================================================
+;;
+;;                ; Ждем до тех пор, пока хоть что-то движется (кроме чудищ)
+;;WaitForSilent:  call    SKA
+;;                mov     cx,1
+;;                call    MakeDelay
+;;                bne     [PSK],0,WaitForSilent
+;;                ;
+;;                call    BeepBolder
+;;                call    DrawLevel
+;;                call    BeepBolder
+;;                ret
+;;
+;;                ; Писк после успешного прохождения уровня
+;;EndLevelSignal: mov     dx,3
+;; .L1:           call    BeepBolder
+;;                call    BeepBolder
+;;                mov     cx,5
+;;                call    MakeDelay
+;;                dec     dx
+;;                jnz     .L1
+;;                ret
+;;                
+
+                ; Редактирование лабиринта
+proc            EditLevel
+                local   PrevUnder:BYTE
+                mov     [GameMode],MODE_EDIT
+                call    ExpandLevel
+                stdcall DrawLevel, Maze
+                mov     [PrevUnder],0
+                mov     dx, 0                   ; Координаты курсора (dh=y, dl=x)
+                ; Цикл редактора
+ .EditLoop:     movzx   esi, dh                 ; адрес в Maze = dh*16+dl; dh << 4 + dl
+                shl     esi, 4
+                movzx   edi, dl
+                lea     esi, [esi+edi+Maze]
+                ;
+                mov     bl,[esi]                ; Мерцаем прямоугольником
+                mov     byte [esi],42
+                stdcall DrawLevel, Maze
+                stdcall ProcessMessages, PM_EXIT_BY_KEY OR PM_EXIT_BY_TIMER, EDIT_CURSOR_DELAY
+                mov     [esi], bl
+                bb      eax, 255, .RSKL
+                jmp     .L1
+ .StoreNew:     mov     [esi], bl
+ .L1:           stdcall DrawLevel, Maze
+                stdcall ProcessMessages, PM_EXIT_BY_KEY OR PM_EXIT_BY_TIMER, EDIT_CURSOR_DELAY
+                bb      eax, 255, .RSKL
+                jmp     .EditLoop
+                ;
+ .RSKL:         br      eax, VK_0, VK_7, .StoreSprite
+                switch  eax, VK_LEFT,    .L1L,        \
+                             VK_RIGHT,   .L1R,        \
+                             VK_UP,      .L1U,        \
+                             VK_DOWN,    .L1D,        \
+                             VK_DELETE,  .CLS,        \
+                             VK_HOME,    .Home,       \
+                             VK_END,     .End,        \
+                             VK_RETURN,  .ENDSAVE,    \
+                             VK_ESCAPE,  .ENDNOSAVE
+                call    BeepBolder
+                jmp     .EditLoop
+                ;
+ .StoreSprite:  mov     bl, al
+                sub     bl, VK_0
+                bne     bl, 5, .StoreNew
+                ;
+                mov     edi,Maze                ; Специальная обработка для человечка
+                mov     ecx,16*12
+                mov     al,5
+                repne   scasb
+                jne     .L2
+                dec     edi
+                mov     al,[PrevUnder]
+                mov     [edi],al
+ .L2:           mov     al,[esi]
+                mov     [PrevUnder],al
+                jmp     .StoreNew
+                ;
+ .Home:         mov     dl,0                    ; Перемещение курсора на первый столбец
+                jmp     .EditLoop
+ .End:          mov     dl,15                   ; Перемещение курсора на последний столбец
+                jmp     .EditLoop
+ .L1L:          be      dl,0,.EditLoop          ; Перемещение курсора ВЛЕВО (DL=DL-1)
+                dec     dl
+                jmp     .EditLoop
+ .L1R:          be      dl,15,.EditLoop         ; Перемещение курсора ВПРАВО (DL=DL+1)
+                inc     dl
+                jmp     .EditLoop
+ .L1U:          be      dh,0,.EditLoop          ; Перемещение курсора ВВЕРХ (DH=DH-1)
+                dec     dh
+                jmp     .EditLoop
+ .L1D:          be      dh,11,.EditLoop         ; Перемещение курсора ВНИЗ (DH=DH+1)
+                inc     dh
+                jmp     .EditLoop
+ .CLS:          mov     edi, Maze               ; Очистка лабиринта
+                mov     ecx, 16*12/4
+                xor     eax, eax
+                rep     stosd
+                jmp     .EditLoop
+ .ENDSAVE:      call    CompressLevel
+;;ENDRLNO:        jmp     ViewNewLoop
+ .ENDNOSAVE:    ret
+endp
+
+proc            SelectLevelForEditing
+                mov     [Level],0
+                mov     esi,GameTitle
+                mov     edi,MAZE_SCREEN
+                call    SlideDown
+                ;
+NewLoop:        call    ExpandLevel
+                call    GetDemoIndex
+                call    GetResourcePtr
+                mov     eax,MODE_VIEW
+                be      [esi+ResourceDataHeader.size], 0, .L1
+                mov     eax,MODE_VIDA
+ .L1:           mov     [GameMode],eax
+                stdcall DrawLevel, Maze
+SelectLoop:     stdcall ProcessMessages, PM_EXIT_BY_KEY, 0
+                switch  eax, VK_ESCAPE, .Done, \
+                             VK_RETURN, .Edit, \
+                             VK_HOME,   .Home, \
+                             VK_END,    .End,  \
+                             VK_RIGHT,  .Next, \
+                             VK_PGDN,   .Next, \
+                             VK_LEFT,   .Prev, \
+                             VK_PGUP,   .Prev
+                ;be      eax,VK_R,VIEW_TEST
+                ;be      eax,VK_D,VIEW_DEMO
+                jmp     SelectLoop
+                ;
+ .Store:        mov     [Level],eax
+                jmp     NewLoop
+                ;
+ .Edit:         call    EditLevel
+                jmp     NewLoop
+                ;
+ .Next:         mov     eax, [Level]
+                be      eax, MAX_LEVELS-1, .Home
+                inc     eax
+                jmp     .Store
+                ;
+ .Home:         mov     eax, 0
+                jmp     .Store
+                ;
+ .Prev:         mov     eax, [Level]
+                be      eax, 0, .End
+                dec     eax
+                jmp     .Store
+                ;
+ .End:          mov     eax, MAX_LEVELS-1
+                jmp     .Store
+                ;
+;;VIEW_TEST:      call    TEST1
+;;                mov     si,BLACK_SCREEN
+;;                mov     di,MAZE_SCREEN
+;;                call    SlideUp
+;;                jmp     ViewNewLoop
+;;VIEW_DEMO:      call    DEMO1
+;;                mov     si,BLACK_SCREEN
+;;                mov     di,MAZE_SCREEN
+;;                call    SlideUp
+;;                jmp     ViewNewLoop
+  .Done:        ret
+endp
+
+;;                ; Очки и попытки на информационную панель
+;;NUMW:           movzx   dx,[Popitk]
+;;                call    RAS
+;;                mov     si,ED+1
+;;                mov     di,GameScore+89
+;;                mov     cx,2
+;;                call    GLG
+;;                mov     dx,[OBK]
+;;                call    RAS
+;;                mov     si,ED+4
+;;                mov     di,GameScore+121
+;;                mov     cx,5
+;;                call    GLG
+;;                ret
+;;
+
+                .udata
+ED              RB      12              ; Для форматирования чисел
+ .size          =       $-ED            ; Размер: чтобы гарантированно вместился Int32
+
+                .code
+                ; Преобразование числа из двоичного 
+                ; представления (EDX) в строковое (ED[12])
+proc            RAS uses eax ebx edx edi
+                xor     eax, eax
+                mov     edi, ED+ED.size-1
+                mov     [edi-3], eax
+                mov     [edi-3-4], eax
+                mov     [edi-3-4*2], eax
+                ;
+                mov     eax, edx
+                mov     ebx, 10
+ .L1:           xor     edx, edx
+                div     ebx
+                mov     [edi], dl
+                dec     edi
+                or      eax, eax
+                jnz     .L1
+                ret
+endp
+
+;;
+;;GLG:            mov     al,[si]
+;;                add     al,60
+;;                mov     [di],al
+;;                add     al,10
+;;                mov     [di-16],al
+;;                dec     si
+;;                inc     di
+;;                loop    GLG
+;;                ret       
+;;
+;;                ; Произвести короткий звучек!!!
+;;SOO:            push    cx
+;;                mov     cx,5
+;; .L1:           call    BeepBolder
+;;                loop    .L1
+;;                pop     cx
+;;                ret
+;;
+;;                ; Инициализация записывателя
+;;InitRecRec:     mov     ax,RecArray
+;;                mov     [RecAddr],ax
+;;                mov     [RecBegin],ax
+;;                mov     [RecRecCode],-1
+;;                ret
+;;
+;;RecToKey:       push    bx
+;;                mov     bl,al
+;;                mov     bh,0
+;;                mov     ah,[bx+xlatRec]
+;;                mov     al,0
+;;                pop     bx
+;;                ret
+;;
+;;KeyToRec:       push    di cx
+;;                mov     di,xlatRec
+;;                mov     cx,xlatRec.size
+;;                mov     al,ah
+;;                repne   scasb
+;;                je      .L1
+;;                mov     di,xlatRec+1
+;; .L1:           dec     di
+;;                mov     ax,di
+;;                sub     ax,xlatRec
+;;                pop     cx di
+;;                ret
+;;                ;       0. 1.     2.       3.       4.        5.      6.
+;;xlatRec         DB      0, VK_UP, VK_DOWN, VK_LEFT, VK_RIGHT, VK_ESC, VK_DEL
+;; .size          =       $-xlatRec
+;;
+;;GetRecordedKeyCode:
+;; .L1:           mov     ah,[RecPlayCode]
+;;                mov     al,ah
+;;                and     al,111b         ; AL=код события
+;;                shr     ah,3            ; AH=счетчик
+;;                dec     ah
+;;                jns     .L2
+;;                bne     [RecCount],0,.L3
+;;                mov     al,6
+;;                jmp     .Done
+;; .L3:           push    si
+;;                mov     si,[RecAddr]
+;;                lodsb
+;;                mov     [RecAddr],si
+;;                mov     [RecPlayCode],al
+;;                dec     [RecCount]
+;;                pop     si
+;;                jmp     .L1
+;; .L2:           shl     ah,3
+;;                or      ah,al
+;;                mov     [RecPlayCode],ah
+;; .Done:         call    RecToKey
+;;                ret
+;;
+;;                ; Записать код нажатой клавиши (код в AH)
+;;RecKeyCode:     push    ax bx di
+;;                call    KeyToRec
+;;                mov     bx,[RecRecCode]
+;;                bne     bx,-1,.L1
+;; .L2:           mov     ah,1
+;;                mov     [RecRecCode],ax
+;;                jmp     .done
+;; .L1:           be      bh,11111b,.inc_new_seq  ; Счетчик переполнен?
+;;                bne     bl,al,.inc_new_seq      ; Коды одинаковые?
+;;                inc     bh                      ; ДА: увеличение счетчика
+;;                mov     [RecRecCode],bx
+;;                jmp     .done
+;; .inc_new_seq:  shl     bh,3
+;;                or      bl,bh
+;;                mov     di,[RecAddr]
+;;                mov     [di],bl
+;;                inc     di
+;;                mov     [RecAddr],di
+;;                jmp     .L2
+;; .done:         pop     di bx ax
+;;                ret
+;;
+;;RecKeyCodeStop: push    bx di cx
+;;                mov     di,[RecAddr]            ; Записать последний код
+;;                mov     ax,[RecRecCode]
+;;                shl     ah,3
+;;                or      al,ah
+;;                stosb
+;;                mov     [RecAddr],di
+;;                mov     cx,di
+;;                sub     cx,[RecBegin]           ; Длина записи
+;;                mov     si,RecArray
+;;                call    GetDemoIndex
+;;                call    ReplaceResource
+;;                call    SaveMainFiles
+;;                pop     cx di bx
+;;                ret
+;;                
+;;                ; Инициализация рекордера для воспроизведения...
+;;InitRecPlay:    call    GetDemoIndex
+;;                call    GetResourcePtr
+;;                lodsw
+;;                mov     [RecCount],ax
+;;                mov     [RecPlayCode],1 SHL 3+6
+;;                be      ax,0,.Done
+;;                mov     [RecBegin],si
+;;                lodsb
+;;                mov     [RecPlayCode],al
+;;                mov     [RecAddr],si
+;;                mov     ax,1
+;; .Done:         ret
+;;
+
+
+                ; 
+                ; Копировать лабиринт
+                ;
+                ; IN    esi - код лабиринта (BLACK_SCREEN - чёрный экран, MAZE_SCREEN - лабиринт по номеру [Level],
+                ;                            иначе адрес распакованного лабиринта)
+                ;       edi - куда копировать лабиринт
+                ;
+                ; OUT   edi - адрес, указывающий на следующую область после лабиринта (IN:edi + размер лабиринта)
+                ;
+proc            MoveOrFill uses ecx esi eax
+                mov     ecx,16*12
+                be      esi,BLACK_SCREEN,.L1
+                bne     esi,MAZE_SCREEN,.L0
+                call    ExpandLevel
+                mov     esi,Maze
+ .L0:           rep     movsb
+                ret
+                ;
+ .L1:           mov     al,0
+                rep     stosb
+                ret
+endp
+
+proc            SlideUpAndBeep
+                call    SlideUp
+                call    BeepBolder
+                ret
+endp
+
+                ;
+                ; Прокрутка экрана (начальный экран -> конечный экран)
+                ;
+                ; IN    esi = адрес начального экрана (0 для черного экрана)
+                ;       edi = адрес конечного экрана (0 для черного экрана)
+                ;
+proc            SlideUp
+                pushad
+                mov     ebx,edi
+                mov     edi,ScrollArea
+                call    MoveOrFill
+                mov     esi,ebx
+                call    MoveOrFill
+                mov     esi,ScrollArea
+                mov     ecx,13
+ .L5:           ;push    esi ecx
+                stdcall DrawLevel, esi
+                ;pop     ecx esi
+                add     esi,16
+                stdcall ProcessMessages, PM_EXIT_BY_TIMER, SLIDE_DELAY
+                loop    .L5
+                popad
+                ret
+endp
+
+;;
+;;SlideDownAndBeep:
+;;                call    SlideDown
+;;                call    BeepBolder
+;;                ret
+;;
+
+                ;
+                ; Прокрутка экрана (конечный экран -> начальный экран)
+                ;
+                ; IN    esi = адрес начального экрана (0 для черного экрана)
+                ;       edi = адрес конечного экрана (0 для черного экрана)
+                ;
+proc            SlideDown
+                pushad
+                mov     ebx,esi
+                mov     esi,edi
+                mov     edi,ScrollArea
+                call    MoveOrFill
+                mov     esi,ebx
+                call    MoveOrFill
+                mov     esi,ScrollArea+16*12
+                mov     ecx,13
+ .L1:           ;push    esi ecx
+                stdcall DrawLevel, esi
+                ;pop     ecx esi
+                sub     esi,16
+                stdcall ProcessMessages, PM_EXIT_BY_TIMER, SLIDE_DELAY
+                loop    .L1
+                popad
+                ret
+endp
+
+;;                ; Добавляем непробиваемые стены со всех сторон
+;;                ; лабиринта, чтобы не делать всемозможных 
+;;                ; проверок на достижение границ лабиринта
+;;MazeToMazeWork: mov     si,Maze
+;;                mov     di,MazeWork
+;;                mov     al,7                    ; Бетон (непробиваемый)
+;;                mov     cx,16+2
+;;                rep     stosb
+;;                mov     dx,12
+;; .L1:           stosb
+;;                mov     cx,16
+;;                rep     movsb
+;;                stosb
+;;                dec     dx
+;;                jnz     .L1
+;;                mov     cx,16+2
+;;                rep     stosb
+;;                ret
+;;
+
+;==============================================================================;
+;  work with resources                                                         ;
+;==============================================================================;
+
+;;                ; Save resource from memory area to file
+;;                ;
+;;                ; In:  DX=filename
+;;                ;
+;;                ; Out: CF=error flag
+;;                ;
+;;SaveResource:   be      [reschanged],FALSE,.Ok
+;;                mov     bx,[resaddr]
+;;                mov     cx,[bx+2]
+;;                call    SaveFile
+;;                jc      .Done
+;;                mov     [reschanged],FALSE
+;; .Ok:           clc
+;; .Done:         ret
+;;
+
+                ;
+                ; Init resource manager
+                ;
+                ; In:  EDI=address of resource area
+                ;      EAX=count of resource entries
+                ;
+proc            InitResMan uses esi edi eax
+                ; Инициализируем заголовок
+                mov     [edi + ResourceMainHeader.magic], 'BLDR'
+                mov     [edi + ResourceMainHeader.count], eax
+                mov     esi, edi        ; Для вычисления размера
+                ; Инициализируем блоки данных
+                add     edi, sizeof.ResourceMainHeader
+ .L1:           mov     [edi + ResourceDataHeader.size], 0
+                add     edi, sizeof.ResourceDataHeader
+                dec     eax
+                jnz     .L1
+                sub     edi, esi
+                mov     [esi + ResourceMainHeader.size], edi
+                mov     [resaddr], esi
+                mov     [reschanged], TRUE
+                call    CalculateResourceCRC
+                ret                
+endp
+
+                ;
+                ; Get ptr to resource
+                ;
+                ; IN    edi - resource index
+                ;
+                ; OUT   esi - resource ptr (point to ResourceDataHeader structure)
+                ;
+proc            GetResourcePtr uses eax edi
+                mov     esi, [resaddr]
+                add     esi, sizeof.ResourceMainHeader
+ .L0:           dec     edi
+                js      .L1
+                movzx   eax, [esi + ResourceDataHeader.size]
+                lea     esi, [esi + eax + sizeof.ResourceDataHeader]
+                jmp     .L0
+ .L1:           ret
+endp
+
+                ; put array [ESI] of length ECX into resource number EDI
+proc            ReplaceResource
+                pushad
+                mov     ebx, [resaddr]          ; Проверка на максимальный номер ресурса
+                cmp     edi, [ebx + ResourceMainHeader.count]
+                jae     .Done
+                push    esi ecx                 ; Сохраним на время адрес и размер новых данных
+                call    GetResourcePtr
+                ; esi = Адрес изменяемого ресурса
+                mov     edx, esi                                ; Сохраним адрес заменяемого ресурса
+                cmp     cx, [edx + ResourceDataHeader.size]     ; Новый размер равен старому? Если да, то просто
+                je      .L1                                     ; заменяем ресурс. Иначе двигаем данные.
+                ; Вычисляем адрес ресурса, следующего за изменяемым
+                movzx   eax, [esi + ResourceDataHeader.size]
+                lea     esi, [esi + eax + sizeof.ResourceDataHeader]
+                ; esi = Адрес ресурса, следующего за изменяемым
+                ; Корректируем размеры 
+                sub     eax, ecx                ; eax = разница между старым и новым размером
+                mov     ecx, [ebx + ResourceMainHeader.size]    ; ecx = сохраняем размер всего ресурса
+                sub     [ebx + ResourceMainHeader.size], eax; корректируем размер всего ресурса
+                mov     edi, esi
+                sub     edi, eax                ; edi = Куда перемещать ресурс, следующего за изменяемым
+                ; Итак, двигаем [esi] -> [edi] by ecx bytes
+                ; Вычисляем, сколько байт нужно сдвинуть
+                ; ecx = ebx + ecx - esi
+                add     ecx, ebx
+                sub     ecx, esi
+                ; Мы готовы, переместить esi -> edi by ecx
+                cmp     esi, edi
+                ja      .Move1
+                ; Двигаем блок вперед
+                lea     esi, [esi+ecx-1]
+                lea     edi, [edi+ecx-1]
+                std
+                rep     movsb
+                cld
+                jmp     .L1
+                ; Двигаем блок назад
+ .Move1:        rep     movsb
+                ; А теперь перемещаем новые данные
+ .L1:           pop     ecx esi
+                mov     edi, edx
+                mov     [edi + ResourceDataHeader.size], cx     ; Новый размер
+                add     edi, sizeof.ResourceDataHeader
+                rep     movsb                                   ; Новые данные
+                call    CalculateResourceCRC
+                mov     [reschanged], TRUE                      ; Устанавливаем флаг измененных ресурсов
+ .Done:         popad
+                ret
+endp
+
+proc            CalculateResourceCRC uses esi eax
+                call    InternalCalcResourceCRC
+                mov     esi, [resaddr]
+                mov     [esi + ResourceMainHeader.crc], eax
+                ret
+endp
+
+proc            CheckResourceCRC uses esi eax
+                call    InternalCalcResourceCRC
+                mov     esi,[resaddr]
+                cmp     eax,[esi+ResourceMainHeader.crc]
+                stc
+                jne     .L1
+                clc
+ .L1:           ret
+endp
+
+                ;
+                ; Вычисляем контрольную сумму ресурсов
+                ;
+                ; OUT   eax = crc32
+                ;
+proc            InternalCalcResourceCRC uses esi ecx
+                mov     esi, [resaddr]
+                mov     ecx, [esi + ResourceMainHeader.size]
+                push    [esi + ResourceMainHeader.crc]
+                mov     [esi + ResourceMainHeader.crc], 0
+                stdcall crc32calc
+                pop     [esi + ResourceMainHeader.crc]
+                ret
+endp
+
+                END

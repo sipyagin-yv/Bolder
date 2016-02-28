@@ -1,0 +1,164 @@
+                format  pe console
+                include "win32wx.inc"
+
+                .data
+testcrc32_lz    file    'testcrc32.txt.lz'
+bolder_lz       file    'bolder.bin.lz'
+src_lz          file    'bolder.src.lz'
+font_lz         file    'fnt8x8.bin.lz'
+demo_lz         file    'demos.bin.lz'
+level_lz        file    'levels.bin.lz'
+text_lz         file    'sometext.txt.lz'
+
+crc32check      db      '123456789'
+
+                section '.udata' data readable writeable
+crc32table      rd      256
+                ;
+testcrc32       rb      5000
+res             rb      65000
+src             rb      1000000
+font            rb      5000
+demos           rb      65000
+levels          rb      65000
+text            rb      10000
+
+                .code
+start:          call    crc32gen
+                mov     esi, crc32check
+                mov     ecx, 9
+                call    crc32calc
+
+                mov     esi, testcrc32_lz
+                mov     edi, testcrc32
+                call    decompress
+
+                mov     esi, src_lz
+                mov     edi, src
+                call    decompress
+
+                mov     esi, bolder_lz
+                mov     edi, res
+                call    decompress
+
+                mov     esi, font_lz
+                mov     edi, font
+                call    decompress
+
+                mov     esi, demo_lz
+                mov     edi, demos
+                call    decompress
+                
+                mov     esi, level_lz
+                mov     edi, levels
+                call    decompress
+
+                mov     esi, text_lz
+                mov     edi, text
+                call    decompress
+                ret
+
+proc            crc32gen uses eax edx
+                xor     eax, eax
+ .L1:           push    eax
+                mov     dl, 8
+ .L3:           shr     eax, 1
+                jnc     .L2
+                xor     eax, 0EDB88320h
+ .L2:           dec     dl
+                jnz     .L3
+                mov     edx, eax
+                pop     eax
+                mov     [crc32table+eax*4], edx
+                inc     al
+                jnz     .L1
+                ret
+endp
+
+proc            crc32calc uses esi ebx ecx
+                mov     eax, -1
+ .L1:           xor     al, [esi]
+                inc     esi
+                movzx   ebx, al
+                shr     eax, 8
+                xor     eax, [crc32table + ebx*4]
+                loop    .L1
+                not     eax
+                ret
+endp
+
+                ; Функция распаковывает сжатый массив
+                ; In    esi - адрес сжатого массива
+                ;       edi - куда распаковывать данные
+                ; Out   eax - если eax > 0, то распаковка прошла без ошибок
+                ;             (eax = длина распакованного массива)
+                ;             если eax = -1, то распаковка прошла с ошибками
+proc            decompress uses ebx ecx edx ebp esi edi
+                ;;; decode size
+                xor     ebx, ebx
+                lodsb
+                mov     cl, al
+                and     ecx, 11b
+                inc     ecx
+ .A1:           shl     ebx, 8
+                mov     bl, [esi]
+                inc     esi
+                loop    .A1
+                shl     ebx, 6
+                shr     al, 2
+                or      bl, al
+                mov     ebp, ebx                ; length of uncompressed data
+                push    ebp
+                mov     ebx, -1                 ; crc32 init
+                ;;; decompress
+ .L0:           movzx   ecx, byte [esi]         ; decompress
+                inc     esi
+                or      cl, cl                  ; ecx = count
+                js      .L1
+                mov     edx, esi                ; edx = новое значение esi
+                add     edx, ecx
+                ;
+                jmp     .LMove
+                ;
+ .L1:           and     cl, 7Fh
+                movzx   eax, byte [esi]         ; eax = смещение назад
+                inc     esi
+                or      al, al
+                jns     .L2
+                and     al, 7Fh                 ; читаем 15-битное смещение назад
+                mov     ah, al
+                mov     al, [esi]
+                inc     esi
+ .L2:           mov     edx, esi                ; edx = новое значение esi
+                ;
+                mov     esi, edi
+                sub     esi, eax
+                ;
+ .LMove:        sub     ebp, ecx
+                js      .fail
+                jecxz   .fail
+                ;;; move bytes and calculate crc32
+ .Move:         lodsb
+                stosb
+                xor     bl, al                  ; calc crc32 of byte in al
+                movzx   eax, bl
+                shr     ebx, 8
+                xor     ebx, [crc32table + eax*4]
+                loop    .Move
+                mov     esi, edx
+                or      ebp, ebp
+                jnz     .L0
+                ;;; done, check crc32
+.OK:            not     ebx                     ; crc32 done
+                lodsd                           ; load crc32
+                cmp     eax, ebx
+                jne     .fail
+                pop     eax                     ; restore length
+                jmp     .done
+                ;;; fail :(
+.fail:          pop     eax                     ; restore length
+                mov     eax, -1                 ; negative indicates an error
+.done:          ret
+endp
+
+                .end    start
