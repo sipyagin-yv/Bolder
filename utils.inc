@@ -1,5 +1,5 @@
-;=== Циклы ===
-                ; Аналог loop label, но с другими регистрами
+;=== Р¦РёРєР»С‹ ===
+                ; РђРЅР°Р»РѕРі loop label, РЅРѕ СЃ РґСЂСѓРіРёРјРё СЂРµРіРёСЃС‚СЂР°РјРё
 macro           loopr   op1, label
 {
         if op1 in <ecx>
@@ -17,7 +17,7 @@ macro           loopb   regs1, regs2, label
                 jb      label
 }
 
-;=== Переход по диапазону ===
+;=== РџРµСЂРµС…РѕРґ РїРѕ РґРёР°РїР°Р·РѕРЅСѓ ===
                 ; if( (op1 >= low) && (op1 <= high) ) goto label
 macro           br      op1, low, high, label
 {
@@ -29,7 +29,7 @@ macro           br      op1, low, high, label
  .L1:
 }
 
-;=== Сравнение + условный переход ===
+;=== РЎСЂР°РІРЅРµРЅРёРµ + СѓСЃР»РѕРІРЅС‹Р№ РїРµСЂРµС…РѕРґ ===
 macro           ba      op1, op2, label
 {
                 cmp     op1, op2
@@ -78,7 +78,7 @@ macro           bns     op1, label
                 jns     label 
 }
 
-;=== Проверки флагов ===
+;=== РџСЂРѕРІРµСЂРєРё С„Р»Р°РіРѕРІ ===
 macro           fset?   op1, op2, label
 {
                 test    op1, op2
@@ -91,14 +91,14 @@ macro           fclear? op1, op2, label
                 jz      label
 }
 
-;=== Возврат значений из функций ===
+;=== Р’РѕР·РІСЂР°С‚ Р·РЅР°С‡РµРЅРёР№ РёР· С„СѓРЅРєС†РёР№ ===
 macro           return  value
 {
                 mov     eax, value
                 ret
 }
 
-;=== Загрузка значений ===
+;=== Р—Р°РіСЂСѓР·РєР° Р·РЅР°С‡РµРЅРёР№ ===
                 ; if (reg == 0) then reg = value
 macro           default reg, value
 {               local   .L1
@@ -107,7 +107,7 @@ macro           default reg, value
  .L1:
 }
 
-;=== Переключатели ===
+;=== РџРµСЂРµРєР»СЋС‡Р°С‚РµР»Рё ===
 macro           switch  reg, [code, label]
 {
         forward
@@ -115,7 +115,7 @@ macro           switch  reg, [code, label]
                 je      label
 }
 
-;=== Строковые операции ===
+;=== РЎС‚СЂРѕРєРѕРІС‹Рµ РѕРїРµСЂР°С†РёРё ===
 macro           BLKOP   opr, count
 {               local   count1, count2
 count1  = count/4
@@ -148,7 +148,7 @@ macro           CMPBLK  source, destination, count
                 BLKOP   cmp, count
 }
 
-;=== Работа с символами Unicode
+;=== Р Р°Р±РѕС‚Р° СЃ СЃРёРјРІРѕР»Р°РјРё Unicode
                 ; SKBCHS - SKip Back CHarS
 macro           trimu   regBase, regIndex, char
 {               local   .L1, .L2

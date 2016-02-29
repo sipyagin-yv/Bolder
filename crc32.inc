@@ -1,5 +1,5 @@
                 .udata
-crc32table      rd      256             ; для вычисления crc32
+crc32table      rd      256             ; РґР»СЏ РІС‹С‡РёСЃР»РµРЅРёСЏ crc32
 
                 .code
                 ;
