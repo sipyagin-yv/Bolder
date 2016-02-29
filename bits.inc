@@ -1,75 +1,131 @@
 struct          TBits
 data            rd      1
+origin          rd      1
 buff            rd      1
 count           rb      1
 ends
 
                 .udata
-
 bits            TBits
 
                 .code
-                ; IN    eax = addr of bits data
-proc            BitsInit
+
+;============================================================================================================;
+; Работа с битами                                                                                            ;
+; ---------------                                                                                            ;
+; BitsPut:                                                                                                   ;
+;       1. Добавляем новые биты в буфер бит слева                                                            ;
+;       2. Отправить накопившиеся биты в буфере бит в выходной поток (если есть)                             ;
+;          2.1 Корректируем битовый буфер                                                                    ;
+; BitsGet:                                                                                                   ;
+;       1. Заполняем битовый буфер, чтобы было достаточное количество бит для чтения                         ;
+;       2. Извлекаем из битового буфера биты слева                                                           ;
+;       3. Корректируем битовый буфер                                                                        ;
+;============================================================================================================;
+                
+                ; IN    addr = addr of bits data
+proc            BitsInit uses eax, addr:DWORD
+                mov     eax, [addr]
                 mov     [bits.data], eax
-                mov     [bits.buff], 0
-                mov     [bits.count], 0
+                mov     [bits.origin], eax
+                xor     eax, eax
+                mov     [bits.buff], eax
+                mov     [bits.count], al
                 ret
 endp
 
-proc            BitsFlush
-                
+                ; Записать бит 0 в выходной поток
+proc            BitsPut0
+                stdcall BitsPut, 0, 1
+                ret
 endp
 
-                ; IN    dl = bits count to put
-                ;       eax = bits
-proc            BitsPut uses eax ebx ecx
-                lea     ebx, [bits]
-                mov     cl, [ebx + TBits.count]
+                ; Записать бит 1 в выходной поток
+proc            BitsPut1
+                stdcall BitsPut, 1, 1
+                ret
+endp
+
+
+proc            BitsGet1
+                stdcall BitsGet, 1
+                ret
+endp
+
+                ; Вывести count бит value в выходной поток
+proc            BitsPut uses eax ebx ecx, value:DWORD, count:BYTE
+                ; Загрузить переменные
+                mov     ebx, [bits.buff]
+                mov     ch, [bits.count]
+                ; Сохранить биты в буфере бит
+                mov     cl, ch
                 shl     eax, cl
-                or      [ebx + TBits.buff], eax
-                add     cl, dl
-                ;
- .L0:           cmp     cl, 8
+                or      ebx, eax
+                add     ch, [count]
+                cmp     ch, 8
                 jb      .L1
-                mov     eax, [ebx + TBits.data]
-                mov     ch, byte [ebx + TBits.buff]
-                mov     [eax], ch
+                ; Сохранить байты в выходном потоке
+                mov     eax, [bits.data]
+                ; Цикл сохранения буфера бит
+ .L2:           mov     [eax], bl
                 inc     eax
-                mov     [ebx + TBits.data]
-                shr     [ebx + TBits.buff], 8
-                sub     cl, 8
-                jmp     .L0
- .L1:           mov     [ebx + TBits.count]
+                shr     ebx, 8
+                sub     ch, 8
+                cmp     ch, 8
+                jae     .L2
+                mov     [bits.data], eax
+                ; Сохранить переменные
+ .L1:           mov     [bits.count], ch
+                mov     [bits.buff], ebx
                 ret
 endp
-                
-                ; IN    dl = bits count to get
-                ; OUT   eax = readed bits
-proc            BitsGet uses ebx ecx
-                lea     ebx, [bits]
-                ; Набираем биты, если их недостаточно
- .L0:           cmp     dl, [ebx + TBits.count]
+
+                ; Прочитать count бит из входного потока
+proc            BitsGet uses ebx ecx edx, count:BYTE
+                ; Загрузить переменные
+                mov     ebx, [bits.buff]
+                mov     ch, [bits.count]
+                mov     cl, [count]
+                ; Заполнить буфер, добавляя прочитанные биты слева
+                cmp     cl, ch  ; Запрашиваем_бит <= имеется_бит ?
                 jbe     .L1
-                ; Читаем байт из входного потока
-                mov     eax, [ebx + TBits.data]
-                inc     eax
-                mov     [ebx + TBits.data], eax
-                movzx   eax, byte [eax-1]
-                ;
-                mov     cl, [ebx + TBits.count]
+                mov     edx, [bits.data]
+                ; Цикл заполнения буфера бит
+ .L2:           movzx   eax, byte [edx]
+                inc     edx
+                xchg    ch, cl
                 shl     eax, cl
-                or      [ebx + TBits.buff], eax
-                add     [ebx + TBits.count], 8
-                jmp     .L0
-                ; Готовим "маску" для чтения бит
- .L1:           mov     cl, dl
+                or      ebx, eax
+                xchg    ch, cl
+                add     ch, 8
+                cmp     cl, ch  ; Запрашиваем_бит > имеется_бит ?
+                ja      .L2
+                mov     [bits.data], edx
+ .L1:           ; Готовим маску для извлечения бит
                 mov     eax, 1
                 shl     eax, cl
                 dec     eax
-                and     eax, [ebx + TBits.buff]
-                ; Обновляем данные
-                shr     [ebx + TBits.buff], cl
-                sub     [ebx + TBits.count], cl
+                ; Извлекаем биты из битового буфера
+                and     eax, ebx
+                ; Корректировать битовый буфер
+                shr     ebx, cl
+                sub     ch, cl
+                ; Сохранить переменные
+                mov     [bits.count], ch
+                mov     [bits.buff], ebx
+                ret
+endp
+
+                ; Вывести в выходной поток оставшиеся биты из буфера
+proc            BitsFlush
+                movzx   eax, [bits.count]
+                or      eax, eax
+                jz      .done
+                neg     al
+                add     al, 8                   ; eax = 8 - eax
+                stdcall BitsPut, 0, eax
+ .done:         ; Вычислить размер сжатых данных
+                mov     eax, [bits.data]
+                sub     eax, [bits.origin]                
                 ret
 endp

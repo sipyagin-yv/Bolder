@@ -1,0 +1,15 @@
+﻿                xor     ebx, ebx
+                mov     cl, 0                   ; bits in buffer
+                ;
+ .Loop:         movzx   eax, byte [esi]
+                inc     esi
+                shl     eax, cl
+                or      ebx, eax
+                add     cl, 3
+                cmp     cl, 8                   ; flush full byte
+                jb      .L1
+                mov     [edi], bl
+                inc     edi
+                shr     ebx, 8
+                sub     cl, 8
+ .L1:           bb      esi, Maze+MAZE_WIDTH*MAZE_HEIGHT, .Loop

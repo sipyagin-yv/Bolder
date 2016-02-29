@@ -73,8 +73,8 @@ proc            ShowError       main_msg:DWORD, user_question:DWORD, user_button
                 jz      .L1
                 ; Удаляем конечные пробелы и точку
                 lea     esi, [system_msg]
-                SKIPBCK esi, eax, ' '
-                SKIPBCK esi, eax, '.'
+                trimu   esi, eax, ' '
+                trimu   esi, eax, '.'
                 mov     word [esi + eax*2], 0
                 ;
                 lea     eax, [system_msg]
@@ -82,10 +82,10 @@ proc            ShowError       main_msg:DWORD, user_question:DWORD, user_button
 
                 lea     edi, [out_msg]
                 ; 1-я строка сообщения
-                sz_movs ProgramName                             ; "BOLDER"
-                sz_st   ':', ' '
-                sz_movs [main_msg]                              ; <главное_сообщение>
-                sz_st   '.'
+                movsu   ProgramName                             ; "BOLDER"
+                stosu   ':', ' '
+                movsu   [main_msg]                              ; <главное_сообщение>
+                stosu   '.'
 
                 ; 2-я строка сообщения, если указаны
                 ; [error.action] или [exception_msg]
@@ -104,35 +104,35 @@ proc            ShowError       main_msg:DWORD, user_question:DWORD, user_button
                 ;
                 ; defined exception.msg:
                 ; [cause exception "<exception_msg"]
-.Line2:         sz_st   13, 10, '['
+.Line2:         stosu   13, 10, '['
                 mov     esi, [error.action]                     ; output action
                 or      esi, esi
                 jz      .L2
-                sz_movs
-                sz_st   ' '
+                movsu
+                stosu   ' '
 .L2:            mov     eax, [exception_msg]                    ; output exception
                 or      eax, eax
                 jz      .L3
-                sz_movs CauseExceptMsg
-                sz_st   '"'
-                sz_movs [exception_msg]
-                sz_st   '"'
+                movsu   CauseExceptMsg
+                stosu   '"'
+                movsu   [exception_msg]
+                stosu   '"'
                 jmp     .L4
-.L3:            sz_movs CauseUnkExcMsg
-.L4:            sz_st   ']', '.'
+.L3:            movsu   CauseUnkExcMsg
+.L4:            stosu   ']', '.'
 
 .CloseMessage:  ; Далее разбираемся с пользовательским вопросом
                 mov     esi, [user_question]
                 or      esi, esi
                 jnz     .user_q
-                sz_st   0
+                stosu   0
                 invoke  MessageBox, 0, addr out_msg, 0, MB_OK + MB_ICONERROR
                 invoke  ExitProcess, eax
                 ret
 
- .user_q:       sz_st   13, 10, 13, 10
-                sz_movs
-                sz_st   0
+ .user_q:       stosu   13, 10, 13, 10
+                movsu  
+                stosu   0
                 mov     eax, [user_buttons]
                 or      eax, eax
                 jnz     .L5

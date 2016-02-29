@@ -1,0 +1,44 @@
+﻿                .const
+newdata         db      'Bolder 3.2 PC resource file. Maked with RESMAKER by YSoft lab'
+ .size          =       $-newdata
+
+newdata1        db      'ABC'
+ .size          =       $-newdata1
+
+newdata2        db      '$'
+ .size          =       $-newdata2
+
+                .udata
+                align   16
+_res            rb      20000
+
+                .code
+                mov     edi, _res
+                mov     ecx, 20000
+                mov     al, -1
+                rep     stosb
+
+                mov     eax, 3
+                mov     edi, _res
+                call    InitResource
+
+                mov     esi, newdata1
+                mov     ecx, newdata1.size
+                mov     edi, 0
+                call    ReplaceResource
+
+                mov     esi, newdata2
+                mov     ecx, newdata2.size
+                mov     edi, 2
+                call    ReplaceResource
+
+                ;delete resources
+                xor     ecx, ecx
+                mov     edi, 0
+                call    ReplaceResource
+                xor     ecx, ecx
+                mov     edi, 1
+                call    ReplaceResource
+                xor     ecx, ecx
+                mov     edi, 2
+                call    ReplaceResource
