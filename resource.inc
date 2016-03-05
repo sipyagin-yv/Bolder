@@ -3,6 +3,17 @@
 ;==============================================================================;
 RESOURCE_AREA_SIZE =    100000          ; Максимальный размер ресурсного файла
 
+struct          ResourceMainHeader
+magic           rd      1                       ; must be "BLDR" or other id
+count           rd      1                       ; count of resources
+size            rd      1                       ; size of resources
+crc             rd      1                       ; crc32 of resources (exclude crc32)
+ends
+
+struct          ResourceDataHeader
+size            rw      1
+ends
+
                 .udata
 _Resource       RB      RESOURCE_AREA_SIZE
 

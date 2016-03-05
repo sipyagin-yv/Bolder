@@ -12,7 +12,9 @@ bit1            rd      1
 ends
 
 compressedData  file    "levels.ac"
-file_name       du      'levels.bin', 0
+
+fn_levels       du      'levels.bin', 0
+fn_freq         du      'levels.freq', 0
 
                 align   16
 levels          rb      192*200
@@ -25,24 +27,30 @@ dest_ptr        rd      1
                 .code
                 include "fileio.inc"
 
-start:          mov     eax, DEC_END-DEC_START
+start:          mov     esi, compressedData
+                mov     edi, levels
+                mov     ecx, 38400
+                call    DecodeAC
 
- DEC_START:     mov     [dest_ptr], levels
-                ;
+                stdcall SaveFile, fn_levels, levels, 38400
+                stdcall SaveFile, fn_freq, model_freq, sizeof.model_freq_item * MODEL_COUNT
+                ret
+
+proc            DecodeAC
+                pushad
+                mov     [counter], ecx          ; Размер для распаковки
+                mov     [dest_ptr], edi
+                ; Инициализируем таблицу частот
                 mov     edi, model_freq
                 mov     ecx, MODEL_COUNT * 2
                 mov     eax, 1                  ; Начальное значение freq
                 rep     stosd
                 ; Начало распаковки
-                mov     [counter], 38400        ; Размер для распаковки
-                ; Заполняем буфер Val
-                mov     esi, compressedData
-                lodsd                           ; аналог команд xor eax,eax; lodsb; shl eax, 8; lodsb; shl eax, 8; lodsb
-                bswap   eax
+                lodsd                           ; загружаем три байта из сжатых данных:
+                bswap   eax                     ; eax = 00 | [esi+0] | [esi+1] | [esi+2]
                 shr     eax, 8
                 dec     esi
                 mov     [source_ptr], esi
-                ;
                 mov     ecx, eax                ; model_val
                 mov     esi, 000000h            ; model_min
                 mov     edi, 1000000h           ; model_max
@@ -69,7 +77,10 @@ start:          mov     eax, DEC_END-DEC_START
                 add     eax, esi
 
                 ; eax = model_mid
+                ; ebx = <free>
                 ; ecx = model_val
+                ; edx = conter and byte
+                ; ebp = bits
                 ; esi = model_min
                 ; edi = model_max
 
@@ -142,17 +153,15 @@ start:          mov     eax, DEC_END-DEC_START
                 jmp     .LoopWhile
  .L5:           dec     dl
                 jnz     .LoopBits
-                ; Сохранить байт DL в выходной поток
+                ; Сохранить байт в выходной поток
                 mov     eax, [dest_ptr]
                 mov     [eax], dh
                 inc     eax
                 mov     [dest_ptr],eax
                 dec     [counter]
                 jnz     .LoopByte
- DEC_END:
-
-                stdcall SaveFile, file_name, levels, 38400
-
+                popad
                 ret
+endp
 
                 .end    start
