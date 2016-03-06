@@ -1,12 +1,16 @@
                 format  PE CONSOLE
                 include "win32wx.inc"
-                include "macro.inc"
+                include "macros.inc"
+                include "utils.inc"
+                include "io.inc"
+                include "resource.inc"
+                include "crc32.inc"
 
 MODEL_BITS      =       13
 MODEL_COUNT     =       (1 SHL MODEL_BITS)
 MODEL_MASK      =       MODEL_COUNT-1
 
-                .data
+                .const
 title           du      'ArithCoderDecoder written in assembler, version 1.00, 05/03/2016', 13, 10, 13, 10, 0
 msgLoadFail     du      13,10,'FAIL: load file', 13, 10, 0
 msgSaveFail     du      13,10,'FAIL: save file', 13, 10, 0
@@ -14,21 +18,29 @@ msgCompareFail  du      13,10,'FAIL: compare files', 13, 10, 0
 compressmsg     du      'COMPRESS', 0
 decompressmsg   du      'DECOMPRESS', 0
 comparemsg      du      'COMPARE', 0
+genBolderBin    du      'CREATE BOLDER.BIN', 0
 donemsg         du      ', done', 13, 10, 13, 10, 0
 
+fn_bolder_bin   du      'bolder.bin', 0
 fn_compressed   du      'levels.ac', 0
 fn_decompressed du      'levels.decoded', 0
 fn_levels       du      'levels.bin', 0
                 ; Statistic
 fn_freq_enc     du      'levels.freq_enc', 0
 fn_freq_dec     du      'levels.freq_dec', 0
+                ;
+resCopyright    db      'Bolder 2.3 PC resource file. Encoded by AC. YSoft (C) 2016'
 
-                align   16
+                .udata
 _buffer_source  rb      100000
 _buffer_encode  rb      100000
 _buffer_decode  rb      100000
 _compare1       rb      100000
 _compare2       rb      100000
+                ;
+_levels         rb      100000
+_levels_compr   rb      100000
+_levels_resource rb     100000
                 ;
 model_freq      rb      sizeof.model_freq_item * MODEL_COUNT
 counter         rd      1
@@ -61,11 +73,43 @@ macro           ENC_AC  src, dst, len
 }
 
                 .code
-                include "io.inc"
 
 start:          mov     eax, AC_END-AC_BEGIN
 
                 MSG     title
+
+                ;=== COMPRESS LEVELS SEPARATELLY ==============================
+                MSG     genBolderBin
+                LOAD    fn_levels, _levels, _levels.size, .fail_load
+
+                call    crc32InitTable
+                mov     edi, _levels_resource
+                mov     eax, 1001
+                call    InitResource
+                mov     esi, resCopyright
+                mov     edi, 1000
+                mov     ecx, resCopyright.size
+                call    ReplaceResource
+
+                xor     ebp, ebp
+ .LoopLevCompr: imul    esi, ebp, 192
+                add     esi, _levels
+                mov     edi, _levels_compr
+                mov     ecx, 192
+                call    EncodeAC
+                mov     edi, ebp
+                mov     esi, _levels_compr
+                mov     ecx, [esi + AC_Header.pk_len]
+                add     esi, sizeof.AC_Header
+                call    ReplaceResource
+                inc     ebp
+                cmp     ebp, 200
+                jb      .LoopLevCompr
+
+                lea     eax, [_levels_resource]
+                mov     eax, [eax + ResourceMainHeader.size]
+                SAVE    fn_bolder_bin, _levels_resource, eax, .fail_save
+                MSG     donemsg
 
                 ;=== COMPRESS =================================================
                 MSG     compressmsg
@@ -339,4 +383,4 @@ proc            DecodeAC
 endp
 AC_END:
 
-                .end    start
+                END

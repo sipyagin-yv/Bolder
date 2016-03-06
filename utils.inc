@@ -99,7 +99,7 @@ macro           return  value
 }
 
 ;=== Загрузка значений ===
-                ; if (reg == 0) then reg = value
+                ; if (reg == 0) reg = value;
 macro           default reg, value
 {               local   .L1
                 bnz     reg, .L1
@@ -149,7 +149,7 @@ macro           CMPBLK  source, destination, count
 }
 
 ;=== Работа с символами Unicode
-                ; SKBCHS - SKip Back CHarS
+                ; TRIMU - TRIM Unicode
 macro           trimu   regBase, regIndex, char
 {               local   .L1, .L2
  .L1:           or      regIndex, regIndex
@@ -161,14 +161,14 @@ macro           trimu   regBase, regIndex, char
  .L2:
 }
 
-                ; STCHS - STore CHarS
+                ; STOSU - STOre String Unicode
 macro           stosu   [chrs]
 {
                 mov     ax, chrs
                 stosw
 }
 
-                ; MVCHS - MoVe CHarS
+                ; MOVSU - MOVe String Unicode
 macro           movsu   source
 {
                 local   .L1

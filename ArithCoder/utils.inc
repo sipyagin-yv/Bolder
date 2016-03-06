@@ -3,6 +3,11 @@ struc           rb      length
   .size         =       $-.
 }
 
+struc           db      [data]
+{            common
+  .             db      data
+  .size         =       $-.
+}
 
 struct          pushad_data
 r_edi           rd      1
