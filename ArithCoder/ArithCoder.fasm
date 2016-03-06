@@ -42,10 +42,14 @@ bit0            rd      1
 bit1            rd      1
 ends
 
-macro           DEC_AC  src, dst, len
+struct          AC_Header
+pk_len          rd      1
+src_len         rd      1
+ends
+
+macro           DEC_AC  src, dst
 {               mov     esi, src
                 mov     edi, dst
-                mov     ecx, len
                 call    DecodeAC
 }
 
@@ -67,16 +71,24 @@ start:          mov     eax, AC_END-AC_BEGIN
                 MSG     compressmsg
                 LOAD    fn_levels, _buffer_source, _buffer_source.size, .fail_load
                 ENC_AC  _buffer_source, _buffer_encode, eax
-                mov     [encLength], eax
-                SAVE    fn_compressed, _buffer_encode, [encLength], .fail_save
+                ;
+                lea     esi, [_buffer_encode]
+                mov     eax, [esi+AC_Header.pk_len]
+                add     eax, sizeof.AC_Header
+                ;
+                SAVE    fn_compressed, _buffer_encode, eax, .fail_save
                 ;SAVE    fn_freq_enc, model_freq, sizeof.model_freq_item * MODEL_COUNT, .fail_save
                 MSG     donemsg
 
                 ;=== DECOMPRESS ===============================================
                 MSG     decompressmsg
                 LOAD    fn_compressed, _buffer_source, _buffer_source.size, .fail_load
-                DEC_AC  _buffer_source, _buffer_decode, 38400
-                SAVE    fn_decompressed, _buffer_decode, 38400, .fail_save
+                DEC_AC  _buffer_source, _buffer_decode
+                ;
+                lea     esi, [_buffer_source]
+                mov     eax, [esi+AC_Header.src_len]
+                ;
+                SAVE    fn_decompressed, _buffer_decode, eax, .fail_save
                 ;SAVE    fn_freq_dec, model_freq, sizeof.model_freq_item * MODEL_COUNT, .fail_save
                 MSG     donemsg
 
@@ -138,169 +150,190 @@ proc            AC_CoderInit
                 ; Инициализируем таблицу частот
                 mov     edi, model_freq
                 mov     ecx, MODEL_COUNT*2
-                mov     eax, 1
+                xor     eax, eax
+                inc     al
                 rep     stosd
                 ; Начальные значения bits, min, max
-                mov     esi, 000000h
-                mov     edi, 1000000h
                 xor     ebp, ebp
+                xor     esi, esi
+ .LoadConstEDI: mov     edi, 1000000h
                 ret
 endp
 
 proc            AC_UpdateMinMax
+                mov     eax, 0ffff00h
                 ; Min = (Min SHL 8) AND 0xffff00;
                 shl     esi, 8
-                and     esi, 0ffff00h
+                and     esi, eax
                 ; Max = (Max SHL 8) AND 0xffff00;
                 shl     edi, 8
-                and     edi, 0ffff00h
+                and     edi, eax
                 ; if(Min >= Max) Max = 0x1000000;
                 cmp     esi, edi
-                jb      .L7
-                mov     edi, 1000000h
- .L7:           ret
+                jae     AC_CoderInit.LoadConstEDI
+                ret
 endp
 
+                ; AL = смещение к model_freq_item.bit0/model_freq_item.bit0
+proc            AC_Update
+                movzx   eax, al
+                inc     dword [model_freq + ebp*8 + eax]
+                shr     al, 2
+                shl     ebp, 1
+                or      ebp, eax
+                and     ebp, MODEL_MASK
+                ret
+endp
+
+proc            AC_CheckWhile
+                mov     eax, edi
+                sub     eax, esi
+                cmp     eax, 256
+                jae     .L1
+                ; if(value==1) Max--;
+                ;==> Max -= value;
+                mov     eax, ebp
+                and     eax, 1
+                sub     edi, eax
+                stc
+ .L1:           ret
+endp
+
+                ; Encode data (compress)
+                ; IN    esi = source data
+                ;       ecx = size of source data
+                ;       edi = buffer to store encoded data
+                ; OUT   -
 proc            EncodeAC
                 pushad
-                mov     [counter], ecx
-                mov     [dest_ptr], edi
-                mov     [dest_ptr_begin], edi
-                mov     [source_ptr], esi
+                mov     [edi + AC_Header.src_len], ecx
+                add     edi, sizeof.AC_Header
+                push    edi                     ; store begin dest address
+                push    ecx                     ; store counter, in [esp]
+                ;
+                push    esi                     ; push source
+                push    edi                     ; push dest
                 ; Начало упаковки
                 call    AC_CoderInit
+                pop     ecx                     ; pop ecx=dest_ptr
+                pop     ebx                     ; pop ebx=source_ptr
+                ; Использование регистров
+                ; eax = mid, temp
+                ; ebx = source_ptr
+                ; ecx = dest_ptr
+                ; edx = dh=кодируемый байт, dl=маска кодируемого бита в кодируемом байте
+                ; ebp = bits
+                ; esi = min
+                ; edi = max
                 ; Читаем очередной байт
- .LoopBytes:    mov     eax, [source_ptr]
-                mov     dh, [eax]
-                inc     eax
-                mov     [source_ptr], eax
+ .LoopBytes:    mov     dh, [ebx]
+                inc     ebx
                 mov     dl, 100b                ; Маска для очередного бита
                 ; Цикл кодирования бит
  .LoopBits:     call    AC_Predict
                 ; if (value == 1) Min = Mid
                 ;            else Max = Mid
+                push    eax
                 test    dh, dl
                 jz      .L3
-                mov     esi, eax
-                ; Обновление для бита 1
-                inc     dword [model_freq + ebp*8 + model_freq_item.bit1]
-                shl     ebp, 1                          ; Готовимся к приёму очередного бита
-                inc     ebp
+                pop     esi
+                mov     al, model_freq_item.bit1; Бит 1
                 jmp     .L4
- .L3:           mov     edi, eax
-                ; Обновление для бита 0
-                inc     dword [model_freq + ebp*8 + model_freq_item.bit0]
-                shl     ebp,1
- .L4:           and     ebp, MODEL_MASK
+ .L3:           pop     edi
+                mov     al, model_freq_item.bit0; Бит 0
+ .L4:           call    AC_Update
                 ; Проверка, не пора ли вывести байт в выходной поток
- .LoopWhile:    mov     eax, edi
-                sub     eax, esi
-                cmp     eax, 256
+ .LoopWhile:    call    AC_CheckWhile
                 jae     .L5
-                ; if(value==1) Max--;
-                test    ebp,1
-                ;test    dh, dl
-                jz      .L6
-                dec     edi
- .L6:           ; OutputByte( Min SHR 16 );
-                mov     eax, [dest_ptr]
-                mov     ebx, esi
-                shr     ebx, 16
-                mov     [eax], bl
-                inc     eax
-                mov     [dest_ptr], eax
+                ; OutputByte( Min SHR 16 );
+                mov     eax, esi
+                bswap   eax
+                mov     [ecx], ah
+                inc     ecx
                 call    AC_UpdateMinMax
                 jmp     .LoopWhile
  .L5:           ; Цикл по битам
                 shr     dl, 1
                 jnz     .LoopBits
-                dec     [counter]
+                dec     dword [esp]
                 jnz     .LoopBytes
+                pop     eax                     ; restore counter, now it equal 0
                 ; OutputByte( Min SHR 16)
                 ; OutputByte( Min SHR 8)
                 ; OutputByte( Min )
-                mov     edi, [dest_ptr]
-                mov     eax, esi
-                bswap   eax
-                shr     eax, 8
-                stosd
-                dec     edi
-                mov     [dest_ptr], edi
+                bswap   esi
+                shr     esi, 8
+                mov     [ecx], esi
+                add     ecx, 3
+                ;
+                pop     eax                     ; restore begin dest address
+                sub     ecx, eax                ; ecx = ecx + 3 - eax
+                mov     [eax-sizeof.AC_Header+AC_Header.pk_len], ecx
                 popad
-                mov     eax, [dest_ptr]
-                sub     eax, [dest_ptr_begin]
                 ret
 endp
 
 proc            DecodeAC
                 pushad
-                mov     [counter], ecx          ; Размер для распаковки
-                mov     [dest_ptr], edi
+                push    [esi+AC_Header.src_len] ; store counter in [esp]
+                add     esi, sizeof.AC_Header
+                push    edi                     ; push dest_ptr
                 ; Начало распаковки
                 lodsd                           ; загружаем три байта из сжатых данных:
                 bswap   eax                     ; eax = 00 | [esi+0] | [esi+1] | [esi+2]
                 shr     eax, 8
                 dec     esi
-                mov     [source_ptr], esi
-                push    eax
+                push    esi                     ; push source_ptr
+                push    eax                     ; push val
                 call    AC_CoderInit
-                pop     ecx
+                pop     ecx                     ; pop val
+                pop     ebx                     ; pop source_ptr
+                ; Использование регистров
+                ; eax = mid, temporary
+                ; ebx = source_ptr
+                ; ecx = val
+                ; edx = dl=счётчик бит, dh=декодируемый байт
+                ; ebp = bits
+                ; esi = min
+                ; edi = max
  .LoopBytes:    mov     edx, 3                  ; dl = количество записываемых бит в байт; dh = формируемый выходной байт
                 ; Вычисляем очередной бит
  .LoopBits:     call    AC_Predict
-                ; if (Val>=Mid) then
-                ; begin
-                ;   Bit:=1;
-                ;   Min:=Mid;
-                ; end else
-                ; begin
-                ;   Bit:=0;
-                ;   Max:=Mid;
-                ; end;
- .L3:           cmp     ecx, eax
+                ; Заранее готовим место под новый бит
+                shl     dh, 1
+                ; if (Val >= Mid) { bit=1; min=mid; }
+                ;           else  { bit=0; max=mid; }
+                push    eax
+                cmp     ecx, eax
                 jb      .bit0
-                mov     esi, eax
-                ; Обновление для бита 1
-                inc     dword [model_freq + ebp*8 + model_freq_item.bit1]
-                shl     ebp, 1
-                inc     ebp
-                shl     dh, 1
-                inc     dh
+                pop     esi
+                mov     al, model_freq_item.bit1; Обновление для бита 1
+                inc     dh                      ; Новый бит = 1
                 jmp     .L4
- .bit0:         mov     edi, eax
-                ; Обновление для бита 0
-                inc     dword [model_freq + ebp*8 + model_freq_item.bit0]
-                shl     ebp, 1
-                shl     dh, 1
- .L4:           and     ebp, MODEL_MASK
+ .bit0:         pop     edi
+                mov     al, model_freq_item.bit0; Обновление для бита 0
+ .L4:           call    AC_Update
                 ; Проверка, не пора ли прочитать очередной байт из входного потока
- .LoopWhile:    mov     eax, edi
-                sub     eax, esi
-                cmp     eax, 256
+ .LoopWhile:    call    AC_CheckWhile
                 jae     .L5
-                ; if (Bit==1) Max--;
-                test    ebp,1                   ; mov eax, ebp
-                ;or      ebx, ebx               ; and eax, 1
-                jz      .L6                     ; sub edi, eax
-                dec     edi
- .L6:           ; Val = ((Val SHL 8) AND $FFFF00) OR InputByte();
-                shl     ecx, 8
-                and     ecx, 0ffff00h
-                mov     eax, [source_ptr]
-                mov     cl, [eax]
-                inc     eax
-                mov     [source_ptr], eax
+                ; Val = ((Val SHL 8) AND $FFFF00) OR InputByte();
+                shl     ecx, 16                 ; ALT:    shl     ecx, 8       
+                shr     ecx, 8                  ;         and     ecx, 0ffff00h
+                mov     cl, [ebx]
+                inc     ebx
                 call    AC_UpdateMinMax
                 jmp     .LoopWhile
  .L5:           dec     dl
                 jnz     .LoopBits
                 ; Сохранить байт в выходной поток
-                mov     eax, [dest_ptr]
+                pop     eax                     ; pop dest_ptr
                 mov     [eax], dh
                 inc     eax
-                mov     [dest_ptr],eax
-                dec     [counter]
+                dec     dword [esp]             ; [counter]
+                push    eax
                 jnz     .LoopBytes
+                pop     eax                     ; pop dest_ptr
+                pop     eax                     ; pop [counter]
                 popad
                 ret
 endp
