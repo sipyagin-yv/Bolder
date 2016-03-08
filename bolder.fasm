@@ -916,13 +916,8 @@ endp
                 .code
 proc            start
         
-                mov     edi, tmp_level_data
-                stosu   'a'
-                stosu   '1', '2', '3'
-                movsu   ProgramName
-
-                lea     eax, [CompressLevel]
-
+                lea     eax, [GameTitle]
+                
                 stdcall crc32InitTable
                 stdcall LoadMainFiles           ; В этой процедуре можем выйти
                 ;
