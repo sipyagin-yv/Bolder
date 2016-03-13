@@ -5,8 +5,8 @@
                 include "io.inc"
                 include "resource.inc"
                 include "crc32.inc"
-                include "ac.inc"
-                include "ac2.inc"
+                include "ac_buffer.inc"
+                include "ac_bits.inc"
                 include "strings.inc"
 
                 .const
@@ -67,39 +67,29 @@ start:          mov     eax, AC2_END-AC2_BEGIN
                 LOAD    fn_levels, _buffer1, _buffer1.size, .fail_load
                 ; ENCODE
                 mov     eax, _buffer_encode
-                call    AC_Encoder_Start
+                call    AC_EncodeStart
                 ;
                 mov     ecx, 38400
                 mov     esi, _buffer1
  .Loop1:        lodsb
-                mov     dl, al
-                shr     dl, 2
-                call    AC_Encoder_EncodeBit
-                mov     dl, al
-                shr     dl, 1
-                call    AC_Encoder_EncodeBit
-                mov     dl, al
-                call    AC_Encoder_EncodeBit
+                mov     bl, 3
+                call    AC_EncodeBits
                 loop    .Loop1
                 ;
-                call    AC_Encoder_End
+                call    AC_EncodeEnd
 
                 ; DECODE
                 mov     eax, _buffer_encode
-                call    AC_Decoder_Start
+                call    AC_DecodeStart
+                ;
                 mov     ecx, 38400
                 mov     edi, _buffer2
- .Loop2:        xor     dl, dl
-                call    AC_Decoder_DecodeBit            ; bit 2
-                shl     al, 2
-                or      dl, al
-                call    AC_Decoder_DecodeBit            ; bit 1
-                shl     al, 1
-                or      dl, al
-                call    AC_Decoder_DecodeBit            ; bit 0
-                or      al, dl
+ .Loop2:        mov     bl, 3
+                call    AC_DecodeBits                   ; bit 2
                 stosb
                 loop    .Loop2
+                ;
+                call    AC_DecodeEnd
 
                 ; COMPARE
                 mov     esi, _buffer1

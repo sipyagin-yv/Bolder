@@ -1,4 +1,4 @@
-                ; Арифметический кодировщик. Кодирует/декодирует указанное количество бит за раз
+                ; Арифметический кодировщик. Кодирует/декодирует указанное количество байт за раз
                 ; Например, можно кодировать/декодировать 1000 байт, 
                 ; в каждом байте декодировать биты с 0 по ENC_MAXBIT.
                 ; Размер кодера+декодера ~ 324 байта
@@ -103,6 +103,18 @@ proc            AC_Update
                 ret
 endp
 
+                ; AL = кодируемый бит
+proc            AC_Update2
+                and     eax, 1
+                shl     eax, 2
+                inc     dword [model_freq + ebp*8 + eax]
+                shr     eax, 2
+                shl     ebp, 1
+                or      ebp, eax
+                and     ebp, MODEL_MASK
+                ret
+endp
+
 proc            AC_CheckWhile
                 mov     eax, edi
                 sub     eax, esi
@@ -151,15 +163,22 @@ proc            EncodeAC
  .LoopBits:     call    AC_Predict
                 ; if (value == 1) Min = Mid
                 ;            else Max = Mid
-                push    eax
                 test    dh, dl
-                jz      .L3
-                pop     esi
-                mov     al, model_freq_item.bit1; Бит 1
-                jmp     .L4
- .L3:           pop     edi
-                mov     al, model_freq_item.bit0; Бит 0
- .L4:           call    AC_Update
+                cmovnz  esi, eax
+                cmovz   edi, eax
+                setnz   al
+                call    AC_Update2
+
+;                push    eax
+;                test    dh, dl
+;                jz      .L3
+;                pop     esi
+;                mov     al, model_freq_item.bit1; Бит 1
+;                jmp     .L4
+; .L3:           pop     edi
+;                mov     al, model_freq_item.bit0; Бит 0
+; .L4:           call    AC_Update
+
                 ; Проверка, не пора ли вывести байт в выходной поток
  .LoopWhile:    call    AC_CheckWhile
                 jae     .L5
@@ -217,20 +236,27 @@ proc            DecodeAC
  .LoopBytes:    mov     edx, ENC_COUNT          ; dl = количество записываемых бит в байт; dh = формируемый выходной байт
                 ; Вычисляем очередной бит
  .LoopBits:     call    AC_Predict
-                ; Заранее готовим место под новый бит
-                shl     dh, 1
-                ; if (Val >= Mid) { bit=1; min=mid; }
-                ;           else  { bit=0; max=mid; }
-                push    eax
                 cmp     ecx, eax
-                jb      .bit0
-                pop     esi
-                mov     al, model_freq_item.bit1; Обновление для бита 1
-                inc     dh                      ; Новый бит = 1
-                jmp     .L4
- .bit0:         pop     edi
-                mov     al, model_freq_item.bit0; Обновление для бита 0
- .L4:           call    AC_Update
+                cmovae  esi, eax
+                cmovb   edi, eax
+                setae   al
+                call    AC_Update2
+                shl     dh, 1
+                or      dh, al
+
+                
+;                shl     dh, 1                   ; Заранее готовим место под новый бит
+;                push    eax                     ; if (Val >= Mid) { bit=1; min=mid; }
+;                cmp     ecx, eax                ;           else  { bit=0; max=mid; }
+;                jb      .bit0
+;                pop     esi
+;                mov     al, model_freq_item.bit1; Обновление для бита 1
+;                inc     dh                      ; Новый бит = 1
+;                jmp     .L4
+; .bit0:         pop     edi
+;                mov     al, model_freq_item.bit0; Обновление для бита 0
+; .L4:           call    AC_Update
+
                 ; Проверка, не пора ли прочитать очередной байт из входного потока
  .LoopWhile:    call    AC_CheckWhile
                 jae     .L5
