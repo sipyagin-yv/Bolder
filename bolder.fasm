@@ -23,12 +23,16 @@ SLIDE_DELAY     =       1               ; Задержка в циклах DELAY
 
                 ; Program constants
 MAX_LEVELS      =       50+50+50+50     ; Максимальное количество уровней
-DEMO_START_INDEX=       500             ; Начальный индекс демонстрации
+LEVEL_INDEX     =       0               ; Начальный индекс уровней
+DEMO_INDEX      =       500             ; Начальный индекс демонстрации
 COPYRIGHT_INDEX =       1000
                 ; Структура ресурсного файла
-                ; 0 .. (MAX_LEVELS-1) = уровни, 
-                ; DEMO_START_INDEX .. DEMO_START_INDEX + (MAX_LEVELS-1) = запись прохождения уровня,
-                ; COPYRIGHT_INDEX = авторская информация/описание
+                ; 0..499 = уровни, 
+                ; 500..999 = запись прохождения уровня
+                ; 1000 = авторская информация/описание
+                ;
+                ; *** на будущее: 1000..1499 = названия уровней        ***
+                ; *** на будущее: 2000 = авторская информация/описание ***
 REC_AREA_SIZE   =       8*1024          ; Область данных для записи прохождения уровня
 MAZE_WIDTH      =       16              ; Ширина лабиринта
 MAZE_HEIGHT     =       12              ; Высота лабиринта
@@ -915,9 +919,6 @@ endp
 ;==============================================================================;
                 .code
 proc            start
-        
-                lea     eax, [GameTitle]
-                
                 stdcall crc32InitTable
                 stdcall LoadMainFiles           ; В этой процедуре можем выйти
                 ;
@@ -1027,22 +1028,13 @@ proc            LoadMainFiles
                 mov     [resaddr], _Resource
                 mov     [reschanged], FALSE
                 ;
- .load:         stdcall LoadFile, ResourceFile, _Resource, RESOURCE_AREA_SIZE
-                jnc     .L0
-                stdcall ShowError, LevLoadErrMsg, load_question, MB_YESNOCANCEL
-                switch  eax, IDYES, .load, \
-                             IDNO, .exit, \
-                             IDCANCEL, .extractoriginal
- .exit:         invoke  ExitProcess, 0
+ .Load:         stdcall LoadFile, ResourceFile, _Resource, RESOURCE_AREA_SIZE
+                jc      .ERRORLoad
+                stdcall CheckResourceCRC
+                jc      .ERRORCrc
+                ret
 
- .L0:           stdcall CheckResourceCRC
-                jnc     .L1
-                CLEARERROR
-                stdcall ShowError, LevCRCErrMsg, crc_question, MB_YESNO
-                switch  eax, IDYES, .extractoriginal, \
-                             IDNO, .exit
-                jmp     .exit
- .extractoriginal:
+ .ExtractOriginal:
                 ; Извлекаем из внутреннего архива оригинальные уровни (на момент компиляции игры)
                 mov     esi, ResourceOriginal
                 mov     edi, _Resource
@@ -1050,7 +1042,21 @@ proc            LoadMainFiles
                 mov     [reschanged], FALSE
                 mov     ecx, [esi + ResourceMainHeader.size]
                 rep     movsb                
- .L1:           ret
+                ret
+
+ .ERRORExit:    invoke  ExitProcess, -1
+
+ .ERRORLoad:    stdcall ShowError, LevLoadErrMsg, load_question, MB_YESNOCANCEL
+                switch  eax, IDYES, .Load, \
+                             IDNO, .ERRORExit, \
+                             IDCANCEL, .ExtractOriginal
+                jmp     .ERRORExit
+
+ .ERRORCrc:     CLEARERROR
+                stdcall ShowError, LevCRCErrMsg, crc_question, MB_YESNO
+                switch  eax, IDYES, .ExtractOriginal, \
+                             IDNO, .ERRORExit
+                jmp     .ERRORExit
 endp
 
                 ; Процедура записывает файл уровней
@@ -1088,7 +1094,7 @@ endp
                 ;
 proc            GetDemoIndex
                 mov     edi,[Level]
-                add     edi,DEMO_START_INDEX
+                add     edi,DEMO_INDEX
                 ret
 endp
 

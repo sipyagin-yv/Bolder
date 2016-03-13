@@ -8,6 +8,10 @@ magic           rd      1                       ; must be "BLDR" or other id
 count           rd      1                       ; count of resources
 size            rd      1                       ; size of resources
 crc             rd      1                       ; crc32 of resources (exclude crc32)
+reserv1         rd      1               ; reserv, must be 0
+reserv2         rd      1               ; reserv, must be 0
+reserv3         rd      1               ; reserv, must be 0
+crcheader       rd      1                       ; crc32 of header
 ends
 
 struct          ResourceDataHeader
@@ -27,11 +31,15 @@ reschanged      RB      1               ; Флаг измененного рес
                 ; In:  EDI=address of resource area
                 ;      EAX=count of resource entries
                 ;
-proc            InitResource uses esi edi eax
+proc            InitResource uses esi edi eax ecx
                 ; Инициализируем заголовок
+                mov     esi, edi                        ; Для вычисления размера
+                mov     ecx, sizeof.ResourceMainHeader  ; Для начала очищаем все поля заголовка
+                xor     eax, eax
+                rep     stosb
+                mov     edi, esi
                 mov     [edi + ResourceMainHeader.magic], 'BLDR'
                 mov     [edi + ResourceMainHeader.count], eax
-                mov     esi, edi        ; Для вычисления размера
                 ; Инициализируем блоки данных
                 add     edi, sizeof.ResourceMainHeader
  .L1:           mov     [edi + ResourceDataHeader.size], 0
@@ -46,7 +54,6 @@ proc            InitResource uses esi edi eax
                 ret                
 endp
 
-                ;
                 ; Get ptr to resource
                 ;
                 ; IN    edi - resource index
@@ -117,34 +124,57 @@ proc            ReplaceResource
                 ret
 endp
 
-proc            CalculateResourceCRC uses esi eax
-                call    InternalCalcResourceCRC
-                mov     esi, [resaddr]
-                mov     [esi + ResourceMainHeader.crc], eax
+                ; Вычисляем контрольную сумму ресурсов
+proc            CalculateResourceCRC
+                pushad
+                mov     ebx, [resaddr]
+                mov     edx, sizeof.ResourceMainHeader
+                
+                ; Сначала вычисляем crc32 самих ресурсов
+                lea     esi, [ebx + edx]
+                mov     ecx, [ebx + ResourceMainHeader.size]
+                sub     ecx, edx
+                stdcall crc32calc
+                mov     [ebx + ResourceMainHeader.crc], eax
+
+                ; Затем вычисляем crc32 заголовка
+                mov     esi, ebx
+                xor     eax, eax
+                mov     [ebx + ResourceMainHeader.crcheader], eax       ; crcheader не учитывает сам crcheader
+                mov     ecx, edx
+                stdcall crc32calc
+                mov     [esi + ResourceMainHeader.crcheader], eax
+                popad
                 ret
 endp
 
-proc            CheckResourceCRC uses esi eax
-                call    InternalCalcResourceCRC
-                mov     esi,[resaddr]
-                cmp     eax,[esi+ResourceMainHeader.crc]
-                stc
-                jne     .L1
-                clc
- .L1:           ret
-endp
-
-                ;
-                ; Вычисляем контрольную сумму ресурсов
-                ;
-                ; OUT   eax = crc32
-                ;
-proc            InternalCalcResourceCRC uses esi ecx
-                mov     esi, [resaddr]
-                mov     ecx, [esi + ResourceMainHeader.size]
-                push    [esi + ResourceMainHeader.crc]
-                mov     [esi + ResourceMainHeader.crc], 0
+proc            CheckResourceCRC
+                pushad
+                mov     ebx, [resaddr]
+                mov     edx, sizeof.ResourceMainHeader
+        
+                ; Сначала вычисляем crc32 заголовка
+                mov     esi, ebx
+                xor     edi, edi
+                xchg    edi, [ebx + ResourceMainHeader.crcheader]
+                mov     ecx, edx
                 stdcall crc32calc
-                pop     [esi + ResourceMainHeader.crc]
+                cmp     eax, edi
+                xchg    edi, [ebx + ResourceMainHeader.crcheader]
+                jne     .error
+                
+                ; А потом вычисляем crc32 самих ресурсов
+                lea     esi, [ebx + edx]
+                mov     ecx, [ebx + ResourceMainHeader.size]
+                sub     ecx, edx
+                stdcall crc32calc
+                cmp     eax, [ebx + ResourceMainHeader.crc]
+                jne     .error
+                clc
+                popad
+                ret
+
+ .error:        stc
+                popad
                 ret
 endp
