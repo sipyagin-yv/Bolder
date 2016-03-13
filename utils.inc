@@ -1,3 +1,9 @@
+;=== Структуры ===
+struct          LARGE_INTEGER
+low             rd      1
+high            rd      1
+ends
+
 ;=== Циклы ===
                 ; Аналог loop label, но с другими регистрами
 macro           loopr   op1, label

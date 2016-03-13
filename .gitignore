@@ -2,3 +2,5 @@
 #ignore local files
 *.ac
 *.freq
+*.exe
+*.

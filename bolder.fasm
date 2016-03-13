@@ -132,6 +132,32 @@ LevSaveErrMsg   du      'Failed to save resource file "bolder.bin"', 0
                 ; "Партнерский" шрифт
 fontdata        file    'fnt8x8.bin'
 
+macro           GET_LEVEL_INDEX
+{
+                mov     edi, [Level]
+                add     edi, LEVEL_INDEX
+}
+
+macro           GET_DEMO_INDEX
+{
+                mov     edi, [Level]
+                add     edi, DEMO_INDEX
+}
+
+macro           GET_LEVEL_PTR
+{
+                mov     edi, [Level]
+                add     edi, LEVEL_INDEX
+                call    GetResourcePtr
+}
+
+macro           GET_DEMO_PTR
+{
+                mov     edi, [Level]
+                add     edi, DEMO_INDEX
+                call    GetResourcePtr
+}
+                
                 ; DOS-цвета текстового режима
 macro           RGBA    red,green,blue
 {
@@ -319,6 +345,8 @@ SubStringAddr:  DD      _levno, _scores, _lives
 _levno:         rb      3+1             ; 3 символа
 _scores:        rb      5+1             ; 5 символов
 _lives:         rb      2+1             ; 2 символов
+MenuMemX        RB      1
+MenuMemY        RB      1
 
 ;=== UDATA ====================================================================
                 .udata
@@ -329,7 +357,7 @@ _lives:         rb      2+1             ; 2 символов
                 ;   1. scr.screen      - Экран программы (текстовый)
                 ;   2. scr.cachescreen - Экран программы, кешированный (текстовый)
                 ;   3. scr.vmem        - Экран вывода (графический)
-struct          scrinfo
+struct          Scr
 enable          rd      1                               ; =0 - рисование запрещено; >0 - рисование разрешено
 dc              rd      1                               ; Контекст для рисования
 dib             rd      1                               ; Bitmap для рисования
@@ -345,24 +373,20 @@ palitre         rd      16                              ; Палитра
 bih             BITMAPINFOHEADER                        ; Информация о картинке (vmem - адрес битовых данных картинки)
 fontdata2       db      256*CHAR_HEIGHT dup(?)          ; "Распакованный" шрифт
 ends
-
-struct          LARGE_INTEGER
-low             rd      1
-high            rd      1
-ends
+scr             Scr
 
 MainWindowClass rd      1
 MainWindow      rd      1
-scr             scrinfo
 
                 ; НЕИНИЦИАЛИЗИРОВАННЫЕ ДАННЫЕ
+HeroCoord       RD      1               ; Координаты человечка
+AlmazesCount    RD      1               ; Кол-во драгоценностей
 GameMode        RD      1               ; Код режима игры
-MenuNo          RB      1               ; Текущий пункт меню
-KLW             RW      1               ; Кол-во драгоценностей
+MenuNo          RD      1               ; Текущий пункт меню
+Level           RD      1               ; Номер текущего лабиринта
+
 KOD             RW      1               ; Код нажатой клавиши
 PRT             RB      1
-KOORD           RW      1               ; Координаты человечка
-Level           RD      1               ; Номер текущего лабиринта
 Popitk          RB      1
 OBK             RD      1               ; Очки
 PSK             RB      1
@@ -373,22 +397,25 @@ Maze            RB      16*12           ; Тут наш лабиринт
                 RB      16              ; Кирпичи, чтобы камни не проваливались
 MazeWork        RB      (16+2)*(12+2)
                 ;
-RecAddr         RW      1               ; Текущий адрес записи/воспроизведения
-RecBegin        RW      1               ; Начало записи/воспроизведения
+struct          Record
+ptr             rd      1
+ptr_begin       rd      1
+ends
+record          Record
+
+RecPtr          RD      1               ; Текущий адрес записи/воспроизведения
+RecBegin        RD      1               ; Начало записи/воспроизведения
 RecRecCode      RW      1               ; Текущие данные для записи
-RecPlayCode     RB      1               ; Текущие данные для воспроизведения
-RecCount        RW      1               ; Длина записи
+RecPlayCode     RB      1               ; Текущие данные для воспроизведения (младшие 3 бита - код события, старшие 5 бит - количество)
+RecSize         RD      1               ; Длина записи
 RecArray        RB      REC_AREA_SIZE   ; Массив записи
                 ;
 tmp_level_data  RB      256
 
-MenuMemX        RB      1
-MenuMemY        RB      1
-
 ;=== CODE =====================================================================
                 .code
 proc            CreateScreen    wchar:DWORD, hchar:DWORD
-                invoke  RtlZeroMemory, scr, sizeof.scrinfo
+                invoke  RtlZeroMemory, scr, sizeof.Scr
                 ;
                 xor     eax, eax
                 mov     [scr.dc], eax
@@ -937,7 +964,9 @@ MenuSelect:     mov     [GameMode],MODE_MENU
                 mov     esi,TXTMainMenu         ; Рисуем меню
                 call    DrawTextBolder
                 ;
-MenuLoop:       mov     al,[MenuNo]
+MenuLoop:       mov     eax,[MenuNo]
+                and     eax, 11b
+                mov     [MenuNo], eax
                 shl     al,1
                 add     al,18
                 mov     [MenuMemY],al
@@ -955,11 +984,11 @@ MenuLoop:       mov     al,[MenuNo]
                              VK_END,    .MenuEnd
                 jmp     MenuLoop
                 ;
- .MenuSelect:   mov     al,[MenuNo]
-                switch  al,0, .MenuGame, \
-                           1, .MenuEdit, \
-                           2, .MenuDemo, \
-                           3, .MenuQuit
+ .MenuSelect:   mov     eax,[MenuNo]
+                switch  eax,0, .MenuGame, \
+                            1, .MenuEdit, \
+                            2, .MenuDemo, \
+                            3, .MenuQuit
                 jmp     MenuLoop
                 ;
  .MenuHome:     mov     [MenuNo], 0
@@ -968,16 +997,10 @@ MenuLoop:       mov     al,[MenuNo]
  .MenuEnd:      mov     [MenuNo], 11b
                 jmp     MenuLoop
                 ;
- .MenuUp:       mov     al,[MenuNo]
-                dec     al
-                and     al,11b
-                mov     [MenuNo],al
+ .MenuUp:       dec     [MenuNo]
                 jmp     MenuLoop
                 ;
- .MenuDown:     mov     al,[MenuNo]
-                inc     al
-                and     al,11b
-                mov     [MenuNo],al
+ .MenuDown:     inc     [MenuNo]
                 jmp     MenuLoop
                 ;
  .MenuEdit:     stdcall SelectLevelForEditing
@@ -990,7 +1013,7 @@ MenuLoop:       mov     al,[MenuNo]
  .MenuGame:     ;;;call    GAME
                 jmp     MenuSelect
                 ;
- .MenuDemo:     ;;;call    DEMO_ALL
+ .MenuDemo:     call    DEMO_FROM_BEGIN
                 jmp     MainMenu
                 ;
  .MenuQuit:
@@ -1082,21 +1105,21 @@ endp
                 ;
                 ; OUT   edi = current level index
                 ;
-proc            GetLevelIndex
-                mov     edi,[Level]
-                ret
-endp
+;proc            GetLevelIndex
+;                mov     edi,[Level]
+;                ret
+;endp
 
                 ;
                 ; Вернуть номер текущего прохождения
                 ;
                 ; OUT   edi = current solve index
                 ;
-proc            GetDemoIndex
-                mov     edi,[Level]
-                add     edi,DEMO_INDEX
-                ret
-endp
+;proc            GetDemoIndex
+;                mov     edi,[Level]
+;                add     edi,DEMO_INDEX
+;                ret
+;endp
 
 proc            InstallKeyboard
                 mov     edi, ScanKeyboardMap
@@ -1203,7 +1226,7 @@ endp
 ;;                ret
 
 proc            BeepBolder
-                pushad  
+                pushad
 ;;                pushad
 ;;                mov     al,0B6h
 ;;                out     043h,al
@@ -1244,7 +1267,7 @@ endp
 ;;
                 ; Подготовить шрифт
 proc            PrepareFont
-                assert  sizeof.scrinfo.fontdata2 = 256*14
+                assert  sizeof.Scr.fontdata2 = 256*14
                 mov     esi,fontdata
                 mov     edi,scr.fontdata2
                 mov     ecx,128
@@ -1519,15 +1542,17 @@ proc            CompressLevel
                 stdcall BitsPut, eax, 3
                 loop    .Loop
                 stdcall BitsFlush
-                ; Сохраняем сжатый уровень в ресурсах
-                mov     ecx, eax                ; ecx = размер сжатый данных (получено от BitsFlush)
-                mov     esi, tmp_level_data
-                call    GetLevelIndex
-                call    ReplaceResource         ; Новый уровень
-                call    GetDemoIndex
+                ;
+                mov     ecx, eax                ; Сохраняем сжатый уровень в ресурсах
+                mov     esi, tmp_level_data     ; ecx = размер сжатый данных (получено от BitsFlush)
+                GET_LEVEL_INDEX                 
+                call    ReplaceResource         ; Сохранить в ресурсах новый уровень
+                ;
                 xor     esi, esi
                 xor     ecx, ecx
+                GET_DEMO_INDEX
                 call    ReplaceResource         ; Удалить демо
+                ;
  .save:         call    SaveMainFiles
                 ; В регистре eax = 0, запись успешна; eax = -1 нет
                 or      eax, eax
@@ -1542,8 +1567,7 @@ endp
                 ; IN    [Level] - maze index in resource (0..MAX_RESOURCE-1)
 proc            ExpandLevel
                 pushad
-                call    GetLevelIndex
-                call    GetResourcePtr                  ; esi = addr of resource; eax = size of resource
+                GET_LEVEL_PTR                           ; esi = addr of resource; eax = size of resource
                 stdcall BitsInit, esi
                 mov     edi, Maze
                 mov     ecx, MAZE_WIDTH * MAZE_HEIGHT
@@ -1807,7 +1831,7 @@ endp
 ;;SM41:           mov     byte [si],39
 ;;                jmp     SR12
 ;;
-;;UPR:            mov     [KOORD],si              ; Координаты человека
+;;UPR:            mov     [HeroCoord],si          ; Координаты человека
 ;;                push    si
 ;;                mov     ax,[KOD]
 ;;                be      ah,VK_LEFT,U1L
@@ -1881,7 +1905,7 @@ endp
 ;;                jmp     SR12
 ;;
 ;;ZWK:            inc     [SoundsCount];call    SOO
-;;                dec     [KLW]
+;;                dec     [AlmazesCount]
 ;;                add     [OBK],SCORE_TREASURE
 ;;UED:            pop     bx
 ;;                pop     si
@@ -2003,14 +2027,14 @@ endp
 ;;                jmp     ZP
 ;; .Ex:           ret
 ;;ZP:             mov     byte [si],2
-;;                inc     [KLW]
+;;                inc     [AlmazesCount]
 ;;                ret
 ;;PP:             mov     [PlayerDie],TRUE        ; ЧЕЛОВЕЧЕК Прихлопнут :(
 ;;                jmp     ZP
 ;;
 ;;SM6:            push    bx
 ;;                push    si
-;;                cmp     si,[KOORD]
+;;                cmp     si,[HeroCoord]
 ;;                jc      MM0_
 ;;SE1:            dec     si
 ;;                dec     bh
@@ -2088,7 +2112,7 @@ endp
 ;;
 ;;SM28:           push    bx
 ;;                push    si
-;;                cmp     si,[KOORD]
+;;                cmp     si,[HeroCoord]
 ;;                jnc     MM1_
 ;;SE3:            dec     si
 ;;                dec     bh
@@ -2173,23 +2197,25 @@ endp
 ;;;------------------------------------------------------------------------------
 ;;
 ;;                ; Подсчет количества драгоценностей
-;;KOLWO:          mov     si,Maze
-;;                mov     dx,0
-;;                mov     cx,192
-;; .L1:           bne     byte [si],2,.L2
-;;                inc     dx
-;; .L2:           inc     si
-;;                loop    .L1
-;;                mov     [KLW],dx
-;;                ; Найти координаты человечка и поместить их в KOORD
-;;                mov     di,Maze
-;;                mov     cx,16*12
-;;                mov     al,5
-;;                repne   scasb
-;;                dec     di
-;;                mov     [KOORD],di
-;;                ret
-;;
+proc            CalculateLevel
+                mov     esi,Maze
+                mov     edx,0
+                mov     ecx,192
+ .L1:           bne     byte [esi],2,.L2
+                inc     edx
+ .L2:           inc     esi
+                loop    .L1
+                mov     [AlmazesCount],edx
+                ; Найти координаты человечка и поместить их в HeroCoord
+                mov     edi,Maze
+                mov     ecx,16*12
+                mov     al,5
+                repne   scasb
+                dec     edi
+                mov     [HeroCoord],edi
+                ret
+endp
+
 ;;;=== GAME CYCLE ===============================================================
 ;;GAME:           mov     [Level],0               ; Номер уровня
 ;;                mov     [Popitk],INIT_LIVES     ; Попыток
@@ -2267,43 +2293,52 @@ endp
 ;; .L1:           ret
 ;;;==============================================================================
 ;;
-;;;=== DEMO CYCLES ==============================================================
-;;DEMO1:          push    [GameMode]
-;;                mov     [GameMode],MODE_DEMO
-;; .DemoLoop:     call    GetDemoIndex            ; Есть данные для демо?
-;;                call    GetResourcePtr
-;;                !!!
-;;                be      word [si],0,.NextLevel2
-;;                call    InitRecPlay
-;;                mov     si,BLACK_SCREEN
-;;                mov     di,MAZE_SCREEN
-;;                call    SlideUpAndBeep          ; Черный экран -> Лабиринт
-;;                call    PlayLoop                ; >ИГРОВОЙ ЦИКЛ<
-;;                be      ax,GAME_LEVEL_DONE,.NextLevel
-;;                be      ax,GAME_PLAY_BREAK,.DemoEnd
-;;                be      ax,GAME_PLAYER_DIE,.DemoEnd
-;;                be      ax,GAME_LEVEL_BREAK,.DemoEnd
-;; .NextLevel:    mov     si,Maze
-;;                mov     di,BLACK_SCREEN
-;;                call    SlideUp                 ; Лабиринт -> черный экран
-;; .NextLevel2:   mov     ax,[Level]
-;;                inc     ax                      ; Перейти к следующему уровню
-;;                be      ax,MAX_LEVELS,.DemoEnd
-;;                mov     [Level],ax
-;;                jmp     .DemoLoop
-;; .DemoEnd:      pop     [GameMode]
-;;                ret
-;;;==============================================================================
-;;
-;;;=== DEMO THRU ALL LEVELS =====================================================
-;;DEMO_ALL:       mov     [Level],0               ; Начать демонстрацию с начала
-;;                call    DEMO1
-;;                ret
-;;;==============================================================================
-;;
-;;;=== PLAY LOOP ================================================================
-;;PlayLoop:       call    KOLWO                   ; Подсчет алм. и выч.коор.чел.
-;;                call    MazeToMazeWork
+
+;=== DEMO CYCLES ==============================================================
+proc            DEMO
+                push    [GameMode]
+                mov     [GameMode],MODE_DEMO
+ .DemoLoop:     GET_DEMO_PTR                    ; Есть данные для демо?
+                or      eax, eax
+                jz      .NextLevel
+                ;;;call    InitRecPlay - в PlayLoop тоже вызывается
+                mov     esi,BLACK_SCREEN
+                mov     edi,MAZE_SCREEN
+                call    SlideUpAndBeep          ; Черный экран -> Лабиринт
+                call    PlayLoop                ; >ИГРОВОЙ ЦИКЛ<
+                switch  eax, GAME_LEVEL_DONE,  .HideLevel, \
+                             GAME_PLAY_BREAK,  .DemoEnd,   \
+                             GAME_PLAYER_DIE,  .DemoEnd,   \
+                             GAME_LEVEL_BREAK, .DemoEnd
+ .HideLevel:    mov     esi,Maze
+                mov     edi,BLACK_SCREEN
+                call    SlideUp                 ; Лабиринт -> черный экран
+ .NextLevel:    mov     eax,[Level]
+                inc     eax                     ; Перейти к следующему уровню
+                be      eax,MAX_LEVELS,.DemoEnd
+                mov     [Level],eax
+                jmp     .DemoLoop
+ .DemoEnd:      pop     [GameMode]
+                ret
+endp
+;==============================================================================
+
+;=== DEMO THRU ALL LEVELS =====================================================
+proc            DEMO_FROM_BEGIN
+                xor     eax, eax
+                mov     [Level],eax               ; Начать демонстрацию с начала
+                ;mov     esi, GameTitle
+                ;mov     edi, MAZE_SCREEN
+                ;call    SlideUp
+                call    DEMO
+                ret
+endp
+;==============================================================================
+
+;=== PLAY LOOP ================================================================
+proc            PlayLoop
+                call    CalculateLevel          ; Подсчет алм. и выч.коор.чел.
+                call    MazeToMazeWork
 ;;                be      [GameMode],MODE_DEMO,.L3
 ;;                call    InitRecRec              ; Настройка ЗАПИСИ
 ;;                jmp     .GameLoop
@@ -2311,7 +2346,7 @@ endp
 ;; .GameLoop:     be      [GameMode],MODE_DEMO,.L0
 ;;                mov     cx,1
 ;;                call    MakeDelay
-;; .L0:           be      [KLW],0,.LevelDone
+;; .L0:           be      [AlmazesCount],0,.LevelDone
 ;;                bne     [GameMode],MODE_DEMO,.L1
 ;;                call    GrabKeyCode
 ;;                be      ah,VK_ESC,.L2           ; Выход во время демо...
@@ -2327,15 +2362,17 @@ endp
 ;;                jmp     .PlayerDie
 ;; .LevelDone:    be      [GameMode],MODE_DEMO,.L4
 ;;                call    RecKeyCodeStop          ; Остановить запись...
-;; .L4:           mov     ax,GAME_LEVEL_DONE      ; УРОВЕНЬ ПРОЙДЕН!!!
-;;                ret
-;; .PlayBreak:    mov     ax,GAME_PLAY_BREAK      ; ВЫХОД ИЗ ИГРЫ!!!
-;;                ret
-;; .LevelBreak:   mov     ax,GAME_LEVEL_BREAK     ; ПЕРЕЗАПУСК УРОВНЯ!!!
-;;                ret
-;; .PlayerDie:    mov     ax,GAME_PLAYER_DIE      ; ЧЕЛОВЕЧКА ПРИБИЛО!!!
-;;                ret
-;;;==============================================================================
+ .L4:           mov     eax,GAME_LEVEL_DONE     ; УРОВЕНЬ ПРОЙДЕН!!!
+                ret
+ .PlayBreak:    mov     eax,GAME_PLAY_BREAK     ; ВЫХОД ИЗ ИГРЫ!!!
+                ret
+ .LevelBreak:   mov     eax,GAME_LEVEL_BREAK    ; ПЕРЕЗАПУСК УРОВНЯ!!!
+                ret
+ .PlayerDie:    mov     eax,GAME_PLAYER_DIE     ; ЧЕЛОВЕЧКА ПРИБИЛО!!!
+                ret                             
+endp
+;==============================================================================
+
 ;;
 ;;                ; Ждем до тех пор, пока хоть что-то движется (кроме чудищ)
 ;;WaitForSilent:  call    SKA
@@ -2449,8 +2486,7 @@ proc            SelectLevelForEditing
                 ;
 NewLoop:        call    ExpandLevel
                 ;
-                call    GetDemoIndex                    ; Проверить, есть ли демо ?
-                call    GetResourcePtr
+                GET_DEMO_PTR                            ; Проверить, есть ли демо ?
                 or      eax, eax
                 mov     eax, MODE_VIEW
                 jz      .L1
@@ -2660,22 +2696,22 @@ endp
 ;;                pop     cx di bx
 ;;                ret
 ;;                
-;;                ; Инициализация рекордера для воспроизведения...
-;;InitRecPlay:    call    GetDemoIndex
-;;                call    GetResourcePtr
-;;                !!!
-;;                lodsw
-;;                mov     [RecCount],ax
-;;                mov     [RecPlayCode],1 SHL 3+6
-;;                be      ax,0,.Done
-;;                mov     [RecBegin],si
-;;                lodsb
-;;                mov     [RecPlayCode],al
-;;                mov     [RecAddr],si
-;;                mov     ax,1
-;; .Done:         ret
-;;
 
+
+                ; Инициализация рекордера для воспроизведения...
+proc            InitRecPlay
+                GET_DEMO_PTR
+                mov     [RecSize],eax
+                mov     [RecPlayCode],1 SHL 3+6
+                be      eax,0,.Done
+                mov     [RecBegin],esi
+                lodsb
+                mov     [RecPlayCode],al
+                mov     [RecPtr],esi
+                xor     eax, eax
+                inc     eax
+ .Done:         ret
+endp
 
                 ; 
                 ; Копировать лабиринт
@@ -2764,24 +2800,25 @@ proc            SlideDown
                 ret
 endp
 
-;;                ; Добавляем непробиваемые стены со всех сторон
-;;                ; лабиринта, чтобы не делать всемозможных 
-;;                ; проверок на достижение границ лабиринта
-;;MazeToMazeWork: mov     si,Maze
-;;                mov     di,MazeWork
-;;                mov     al,7                    ; Бетон (непробиваемый)
-;;                mov     cx,16+2
-;;                rep     stosb
-;;                mov     dx,12
-;; .L1:           stosb
-;;                mov     cx,16
-;;                rep     movsb
-;;                stosb
-;;                dec     dx
-;;                jnz     .L1
-;;                mov     cx,16+2
-;;                rep     stosb
-;;                ret
-;;
+                ; Добавляем непробиваемые стены со всех сторон
+                ; лабиринта, чтобы не делать всемозможных 
+                ; проверок на достижение границ лабиринта
+proc            MazeToMazeWork
+                mov     esi,Maze
+                mov     edi,MazeWork
+                mov     al,7                    ; Бетон (непробиваемый)
+                mov     ecx,16+2
+                rep     stosb
+                mov     edx,12
+ .L1:           stosb
+                mov     ecx,16
+                rep     movsb
+                stosb
+                dec     edx
+                jnz     .L1
+                mov     ecx,16+2
+                rep     stosb
+                ret
+endp
 
                 END
