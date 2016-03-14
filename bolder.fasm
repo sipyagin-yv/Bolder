@@ -946,6 +946,8 @@ endp
 ;==============================================================================;
                 .code
 proc            start
+                mov     eax, CompressLevel
+
                 stdcall crc32InitTable
                 stdcall LoadMainFiles           ; В этой процедуре можем выйти
                 ;
@@ -1053,6 +1055,7 @@ proc            LoadMainFiles
                 ;
  .Load:         stdcall LoadFile, ResourceFile, _Resource, RESOURCE_AREA_SIZE
                 jc      .ERRORLoad
+                ;;;call    CalculateResourceCRC
                 stdcall CheckResourceCRC
                 jc      .ERRORCrc
                 ret
