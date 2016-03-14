@@ -1,0 +1,26 @@
+                format  PE CONSOLE
+                include "win32wx.inc"
+
+macro           ret
+{
+                display 'return2'
+ .return:       ret
+}
+
+macro           M1
+{
+                mov     eax, 1
+}
+
+macro           M1 ; переопределение макроса
+{
+                M1 ; вызываем предыдущую версию макроса
+                add     eax, 2
+}
+
+proc            start
+                M1
+                ret
+                jmp     .return
+endp
+                .end    start

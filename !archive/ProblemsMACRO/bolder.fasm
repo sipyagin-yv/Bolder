@@ -1,0 +1,23 @@
+                FORMAT  PE GUI
+                stack   8192
+                include "win32wx.inc"
+                include "sections.inc"
+
+                .defines
+                display 'define CLEARERROR',13,10
+macro           CLEARERROR
+{
+                xor     eax, eax
+}
+
+                .code
+proc            CreateScreen
+                CLEARERROR
+endp
+                .code
+proc            start
+                stdcall CreateScreen
+                invoke  ExitProcess, 0
+endp
+
+                END

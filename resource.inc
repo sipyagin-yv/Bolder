@@ -20,7 +20,6 @@ ends
 
                 .udata
 _Resource       RB      RESOURCE_AREA_SIZE
-
 resaddr         RD      1               ; Адрес ресурсов
 reschanged      RB      1               ; Флаг измененного ресурса
 

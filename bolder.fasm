@@ -1,25 +1,28 @@
                 FORMAT  PE GUI
                 stack   8192
                 include "win32wx.inc"
+                include "sections.inc"
+                ;
                 include "macros.inc"
-                include "utils.inc"
-                include "windows.inc"
                 include "errors.inc"
+                include "fileio.inc"
+                include "windows.inc"
                 include "crc32.inc"
                 include "keys.inc"
                 include "bits.inc"
                 include "resource.inc"
 
                 ; Win32-version specific constants
-CHAR_WIDTH      =       8
-CHAR_HEIGHT     =       14
-SCREEN_WIDTH    =       80
-SCREEN_HEIGHT   =       28
+CHAR_WIDTH      =       8               ; in pixels
+CHAR_HEIGHT     =       14              ; in pixels
+SCREEN_WIDTH    =       80              ; in chars
+SCREEN_HEIGHT   =       28              ; in chars
 
                 ; ЗНАЧЕНИЯ ЗАДЕРЖКИ
-DELAY           =       55
-EDIT_CURSOR_DELAY =     2               ; Задержка в циклах DELAY
-SLIDE_DELAY     =       1               ; Задержка в циклах DELAY
+DELAY           =       55              ; Базовое значение цикла задержки
+EDIT_CURSOR_DELAY =     2               ; Задержка курсора редактора в циклах DELAY
+SLIDE_DELAY     =       1               ; Задержка прокрутки в циклах DELAY
+GAME_DELAY      =       1               ; Задержка игры в циклах DELAY
 
                 ; Program constants
 MAX_LEVELS      =       50+50+50+50     ; Максимальное количество уровней
@@ -80,19 +83,11 @@ MainWindowClassName     du      'BolderDash_wnd', 0
 MainWindowTitle         du      'Bolder Dash 3.2', 0
 
                 ; Сообщения об ошибках
-ErrorCreateMainClass    du      'Can''t register window class', 0
-ErrorCreateMainWindow   du      'Can''t create window', 0
-ErrorCreateImageDC      du      'Can''t create image (DC)', 0
-ErrorCreateImageDIB     du      'Can''t create image (DIB)', 0
 ErrorReadNotEqRequested du      'Readed bytes not equal requested bytes', 0
 ErrorWritedNotEqRequested du    'Write bytes not equal requested bytes', 0
 ErrorResourceTooBig     du      'Size of resource is too big to load', 0
                         ;
 ActionCreateFile        du      'Create file', 0
-ActionRegisterClass     du      'Register class', 0
-ActionCreateWindow      du      'Create window', 0
-ActionCreateCompDC      du      'Create compatible DC', 0
-ActionCreateDIBSect     du      'Create DIB section', 0
 ActionOpenFile          du      'Open file', 0
 ActionCloseHandle       du      'Close file', 0
 ActionGetFileSize       du      'Get file size', 0
@@ -122,13 +117,14 @@ crc_question:   du      'Levels loaded, but CRC is wrong... Use original levels 
 
 ResourceFile    du      'bolder.bin', 0
 
-ResourceOriginal file   'resources\bolder.original.bin'
 
                 ; Original error messages
 LevCRCErrMsg    du      'Resource file "bolder.bin" is corrupted', 0
 LevLoadErrMsg   du      'Can''t load resource file "bolder.bin"', 0
 LevSaveErrMsg   du      'Failed to save resource file "bolder.bin"', 0
 
+                ; Оригинальные ресурсы (с которыми поставляется игра)
+ResourceOriginal file   'resources\bolder.original.bin'
                 ; "Партнерский" шрифт
 fontdata        file    'fnt8x8.bin'
 
@@ -341,6 +337,7 @@ TXTVR:          DB      _ATTR,0Fh,_XY,7,1,' VERSION 3.2 PC',_END
 COPYR_TXT:      DB      _ATTR,0Bh,_XY,53,1,'BY YSOFT LAB., 1991',_END
 SubStringAddr:  DD      _levno, _scores, _lives
 
+                ; НЕИНИЦИАЛИЗИРОВАННЫЕ ДАННЫЕ
                 .udata
 _levno:         rb      3+1             ; 3 символа
 _scores:        rb      5+1             ; 5 символов
@@ -348,51 +345,20 @@ _lives:         rb      2+1             ; 2 символов
 MenuMemX        RB      1
 MenuMemY        RB      1
 
-;=== UDATA ====================================================================
-                .udata
-                ; Структура для определения рабочего экрана 
-                ; (аналог консоли, но свой, со своими символами)
-                ; 
-                ; Существует 3 экрана:
-                ;   1. scr.screen      - Экран программы (текстовый)
-                ;   2. scr.cachescreen - Экран программы, кешированный (текстовый)
-                ;   3. scr.vmem        - Экран вывода (графический)
-struct          Scr
-enable          rd      1                               ; =0 - рисование запрещено; >0 - рисование разрешено
-dc              rd      1                               ; Контекст для рисования
-dib             rd      1                               ; Bitmap для рисования
-vmem            rd      1                               ; Битовые данные Bitmap(dib)
-pixels          POINT                                   ; Размеры экрана в пикселах
-chars           POINT                                   ; Размеры экрана в символах
-pitch           rd      1                               ; Размер скан-строки, в байтах
-screen          rw      SCREEN_WIDTH*SCREEN_HEIGHT      ; Рабочий экран
-cachescreen     rw      SCREEN_WIDTH*SCREEN_HEIGHT      ; Экран, с нарисованными в mem символами
-translADDR      rd      SCREEN_WIDTH*SCREEN_HEIGHT      ; Таблица для вычисления адреса по смещению символа
-translCH        rd      256                             ; Таблица для вычисления адреса маски символа
-palitre         rd      16                              ; Палитра
-bih             BITMAPINFOHEADER                        ; Информация о картинке (vmem - адрес битовых данных картинки)
-fontdata2       db      256*CHAR_HEIGHT dup(?)          ; "Распакованный" шрифт
-ends
-scr             Scr
-
-MainWindowClass rd      1
-MainWindow      rd      1
-
-                ; НЕИНИЦИАЛИЗИРОВАННЫЕ ДАННЫЕ
 HeroCoord       RD      1               ; Координаты человечка
 AlmazesCount    RD      1               ; Кол-во драгоценностей
 GameMode        RD      1               ; Код режима игры
 MenuNo          RD      1               ; Текущий пункт меню
 Level           RD      1               ; Номер текущего лабиринта
 
-KOD             RW      1               ; Код нажатой клавиши
+KOD             RD      1               ; Код нажатой клавиши
 PRT             RB      1
 Popitk          RB      1
 OBK             RD      1               ; Очки
 PSK             RB      1
 ScrollArea      RB      16*12*2
 SoundsCount     RW      1
-PlayerDie       RB      1               ; Флаг дохлого человечка
+HeroDie         RB      1               ; Флаг дохлого человечка
 Maze            RB      16*12           ; Тут наш лабиринт
                 RB      16              ; Кирпичи, чтобы камни не проваливались
 MazeWork        RB      (16+2)*(12+2)
@@ -403,258 +369,26 @@ ptr_begin       rd      1
 ends
 record          Record
 
+; Данные воспроизведения закодированы так (после двоеточия - количество бит)
+; count:5, key:3
+; count - сколько циклов игры нажата клавиша key
+; key - код нажатой клавиши:
+;   0 - ничего не нажимали
+;   1 - VK_LEFT
+;   2 - VK_RIGHT
+;   3 - VK_UP
+;   4 - VK_DOWN
+;   5 - VK_ESCAPE (покинуть уровень)
+;   6 - VK_DELETE (самоуничтожение)
+;   7 - код не используется
 RecPtr          RD      1               ; Текущий адрес записи/воспроизведения
-RecBegin        RD      1               ; Начало записи/воспроизведения
-RecRecCode      RW      1               ; Текущие данные для записи
-RecPlayCode     RB      1               ; Текущие данные для воспроизведения (младшие 3 бита - код события, старшие 5 бит - количество)
 RecSize         RD      1               ; Длина записи
+RecCode         RB      1               ; Текущие данные для записи/воспроизведения
 RecArray        RB      REC_AREA_SIZE   ; Массив записи
                 ;
 tmp_level_data  RB      256
 
-;=== CODE =====================================================================
                 .code
-proc            CreateScreen    wchar:DWORD, hchar:DWORD
-                invoke  RtlZeroMemory, scr, sizeof.Scr
-                ;
-                xor     eax, eax
-                mov     [scr.dc], eax
-                mov     [scr.dib], eax
-                ;
-                mov     eax, [wchar]
-                mov     [scr.chars.x], eax
-                imul    eax, CHAR_WIDTH         ; Ширина символа
-                mov     [scr.pixels.x], eax
-                ;
-                mov     eax, [hchar]
-                mov     [scr.chars.y], eax
-                imul    eax, CHAR_HEIGHT        ; Высота символа
-                mov     [scr.pixels.y], eax
-                ;
-                mov     eax, [scr.pixels.x]
-                shl     eax, 2                  ; "размер" одного пиксела - 4 байта: "0 R G B"
-                mov     [scr.pitch], eax
-                ;
-                ; Создать DC
-                ;
-                invoke  CreateCompatibleDC, 0
-                mov     [scr.dc], eax
-                or      eax, eax
-                jnz     .L1
-
-                SYSTEMERROR     ActionCreateCompDC
-                stdcall ShowError, ErrorCreateImageDC, 0, 0
-
- .L1:           ;
-                ; Создать bitmap, для рисования и вывода в окно
-                ;
-                invoke  RtlZeroMemory, scr.bih, sizeof.BITMAPINFOHEADER
-                lea     edx, [scr.bih]
-                mov     [edx + BITMAPINFOHEADER.biSize], sizeof.BITMAPINFOHEADER
-                ;
-                mov     eax, [scr.pixels.x]
-                mov     [edx + BITMAPINFOHEADER.biWidth], eax
-                ;
-                mov     eax, [scr.pixels.y]
-                neg     eax                             ; top-down, т.е. начало блока памяти - левый-верхний пиксел
-                mov     [edx + BITMAPINFOHEADER.biHeight], eax
-                ;
-                mov     [edx + BITMAPINFOHEADER.biPlanes], 1
-                mov     [edx + BITMAPINFOHEADER.biBitCount], 32
-                mov     [edx + BITMAPINFOHEADER.biCompression], BI_RGB
-                ;;mov     [edx + BITMAPINFOHEADER.biSizeImage], 0
-                ;;mov     [edx + BITMAPINFOHEADER.biXPelsPerMeter], 0
-                ;;mov     [edx + BITMAPINFOHEADER.biYPelsPerMeter], 0
-                ;;mov     [edx + BITMAPINFOHEADER.biClrUsed], 0
-                ;;mov     [edx + BITMAPINFOHEADER.biClrImportant], 0
-                ;
-                invoke  CreateDIBSection, \
-                        [scr.dc], \
-                        edx, \
-                        DIB_RGB_COLORS, \
-                        scr.vmem, \
-                        NULL, 0
-                mov     [scr.dib], eax
-                or      eax, eax
-                jnz     .L2
-
-                SYSTEMERROR   ActionCreateDIBSect
-                stdcall ShowError, ErrorCreateImageDIB, 0, 0
-
- .L2:           ;
-                ; Установить размеры клиентской части окна 
-                ; (вначале размер клиентской части равен размеру экрана)
-                ;
-                stdcall SetClientSize, [MainWindow], [scr.pixels.x], [scr.pixels.y]
-                ;
-                ; Распаковка шрифта
-                ;
-                call    PrepareFont
-                ;
-                ; Создать перекодировочную таблицу для вычисления адреса экрана
-                ; addr = y * CHAR_HEIGHT * scr.pixels.x + x * CHAR_WIDTH
-                ; offset = pixel * 4 + scr.mem
-                ;
-                lea     edi, [scr.translADDR]
-                mov     ebx, 0                  ; for(y=0; y<scr.chars.y; y++)
-                ;
-.LoopY:         mov     ecx, 0                  ; for(x=0; x<scr.chars.x; x++)
-                imul    eax, ebx, CHAR_HEIGHT   ; вынос подвыражения (y * CHAR_HEIGHT * scr.pixels.x) за пределы цикла
-                imul    eax, [scr.pixels.x]
-                ;
-.LoopX:         imul    edx, ecx, CHAR_WIDTH
-                add     edx, eax
-                shl     edx, 2
-                add     edx, [scr.vmem]
-                mov     [edi], edx
-                add     edi, 4
-                ;
-                loopb   ecx, [scr.chars.x], .LoopX
-                loopb   ebx, [scr.chars.y], .LoopY
-                ;
-                ; Создать перекодировочную таблицу для вычисления адреса символа
-                ;
-                xor     ecx, ecx                ; for(ecx=0; ecx<256; ecx++)
- .tr2:          imul    eax, ecx, CHAR_HEIGHT
-                add     eax, scr.fontdata2
-                mov     [scr.translCH+ecx*4], eax
-                inc     cl
-                jnz     .tr2
-                ;
-                ; Инициализация экранов
-                ;
-                lea     edi, [scr.screen]
-                mov     ecx, SCREEN_WIDTH*SCREEN_HEIGHT
-                mov     ax, 0F20h
-                rep     stosw
-                ;
-                lea     edi, [scr.cachescreen]
-                mov     ecx, SCREEN_WIDTH*SCREEN_HEIGHT
-                not     ax                      ; Чтобы в первый раз перерисовать в scr.vmem весь экран
-                rep     stosw
-                ;
-                ; Подготовка палитры по умолчанию
-                ;
-                lea     esi, [defaultpalitre]
-                lea     edi, [scr.palitre]
-                mov     ecx, 16
-                rep     movsd
-                ;
-                ; Разрешаем рисование
-                ;
-                mov     [scr.enable], -1
-                ;
-                ; Показать то, что скрыто
-                ;
-                invoke  ShowWindow, [MainWindow], SW_SHOWNORMAL
-                ret
-endp
-
-proc            DeleteScreen
-                invoke  DeleteObject, [scr.dib]
-                invoke  DeleteDC, [scr.dc]
-                ret
-endp
-
-proc            CreateMainWindow
-                local   wc:WNDCLASS
-                ;
-                xor     eax, eax
-                mov     [MainWindow], eax
-                mov     [MainWindowClass], eax
-                ;
-                ; Регистрация класса
-                ;
-                invoke  RtlZeroMemory, addr wc, sizeof.WNDCLASS
-                ;
-                ;;mov     [wc.style], 0
-                mov     [wc.lpfnWndProc], MainWindowProc
-                ;;mov     [wc.cbClsExtra], 0              ; no extra class data
-                ;;mov     [wc.cbWndExtra], 0              ; no extra window data
-
-                invoke  GetModuleHandle, 0
-                mov     [wc.hInstance], eax
-
-                ;;mov     [wc.hIcon], NULL                ; NULL, no icon
-
-                invoke  LoadCursor, 0, IDC_ARROW        ; Загружаем курсор по умолчанию
-                mov     [wc.hCursor], eax
-
-                ;;mov     [wc.hbrBackground], 0           ; =0, значит приложение само рисует клиентскую часть
-                ;;mov     [wc.lpszMenuName], NULL         ; NULL, no menu
-                mov     [wc.lpszClassName], MainWindowClassName
-
-                invoke  RegisterClassW, addr wc
-                mov     [MainWindowClass], eax
-                test    eax, eax
-                jnz     .L1
-                
-                SYSTEMERROR     ActionRegisterClass
-                stdcall ShowError, ErrorCreateMainClass, 1
-                
- .L1:           ;
-                ; Создание главного окна (но пока не показываем его)
-                ;
-                invoke  CreateWindowEx, \
-                        WS_EX_OVERLAPPEDWINDOW, \
-                        MainWindowClassName, \
-                        MainWindowTitle, \
-                        WS_OVERLAPPEDWINDOW, \
-                        CW_USEDEFAULT, 0, \
-                        200, 200, \
-                        0, 0, [wc.hInstance], 0
-                mov     [MainWindow], eax
-                test    eax, eax
-                jnz     .L2
-
-                SYSTEMERROR     ActionCreateWindow
-                stdcall ShowError, ErrorCreateMainWindow, 0, 0
-
- .L2:           ret
-endp
-
-proc            DeleteMainWindow
-                invoke  DestroyWindow, [MainWindow]
-                invoke  UnregisterClass, MainWindowClassName, 0
-                ret
-endp
-
-proc            SetClientSize   hWnd:DWORD, clientWidth:DWORD, clientHeight:DWORD
-                local   clientRect:RECT
-                local   windowRect:RECT
-                ; Определяем размеры клиентской части окна
-                invoke  GetClientRect, [MainWindow], addr clientRect
-                ; Определяем размеры окна
-                invoke  GetWindowRect, [MainWindow], addr windowRect
-                ; Т.к. функции установки размеров клиентской части окна нет, то делаем следующее:
-                ; нужно вычислить размер бордюров и прочих элементов, для этого нужно 
-                ; от текущих размеров окна вычесть размер клиентской части, 
-                ; w = windowRect.Right-windowRect.Left-clientRect.right
-                ; h = windowRect.Bottom-windowRect.Top-clientRect.bottom
-                ; и прибавить к w новый размер клиентской части
-                ; w += clientWidth
-                ; h += clientHeigh
-                ; Полученные значения w, h есть размеры окна, у которого размер клиентской части
-                ; будет clientWidth, clientHeight
-                mov     eax, [windowRect.right]
-                sub     eax, [windowRect.left]
-                sub     eax, [clientRect.right]
-                add     eax, [clientWidth]
-                ;
-                mov     ebx, [windowRect.bottom]
-                sub     ebx, [windowRect.top]
-                sub     ebx, [clientRect.bottom]
-                add     ebx, [clientHeight]
-                ;
-                invoke  SetWindowPos, \
-                        [MainWindow], \
-                        0, \                            ; not used
-                        0, 0, \                         ; not used
-                        eax, ebx, \                     ; new width and height
-                        SWP_NOMOVE + SWP_NOZORDER       ; меняем только размеры окна!
-                ret
-endp
-
 proc            UpdateScreen
                 local   client:RECT
                 local   ps:PAINTSTRUCT
@@ -841,106 +575,6 @@ proc            ProcessMessages flags:DWORD, delay:DWORD
                 return  [KeyCode]
 endp
 
-                ; Load file into memory
-                ;
-                ; IN:   fileName - file of the loading file
-                ;       fileBuffer - buffer, where the file is loading
-                ;       fileBufferSize - size of the buffer
-                ;
-                ; OUT:  CF=1, if error
-                ;       CF=0, otherwise
-proc            LoadFile        fileName:DWORD, fileBuffer:DWORD, fileBufferSize:DWORD
-                local   fileSize:LARGE_INTEGER
-                local   h:DWORD
-                local   fileReaded:DWORD
-
-                pushad
-                invoke  CreateFile, [fileName], GENERIC_READ, \ ; Открываем файл для чтения
-                        0, NULL, OPEN_EXISTING, 0, 0
-                mov     [h], eax
-                cmp     eax, INVALID_HANDLE_VALUE
-                jne     .L1
-                SYSTEMERROR     ActionOpenFile
-                jmp     .fail
-
- .L1:           invoke  GetFileSizeEx, [h], addr fileSize       ; Определяем размер файла
-                or      eax, eax
-                jnz     .L2
-                SYSTEMERROR     ActionGetFileSize
-                jmp     .fail
-
- .L2:           mov     eax, [fileSize.high]                    ; Проверяем максимальный размер
-                or      eax, eax
-                jnz     .L3
-                mov     eax, [fileSize.low]
-                cmp     eax, [fileBufferSize]
-                jbe     .L4
- .L3:           USERERROR       , ErrorResourceTooBig
-                jmp     .fail
-
- .L4:           invoke  ReadFile, [h], [fileBuffer], \          ; Читаем файл
-                        [fileSize.low], addr fileReaded, NULL
-                or      eax, eax
-                jz      .L5
-                mov     eax, [fileReaded]
-                cmp     eax, [fileSize.low]
-                je      .L6
-
-                USERERROR       , ErrorReadNotEqRequested
-                jmp     .fail
-
- .L5:           SYSTEMERROR     ActionReadFile
-                jmp     .fail
-
- .L6:           invoke  CloseHandle, [h]                        ; Закрываем файл
-                or      eax, eax
-                clc
-                jnz     .return
-
-                SYSTEMERROR     ActionCloseHandle
-
- .fail:         stc
- .return:       popad
-                ret
-endp
-
-proc            SaveFile        fileName:DWORD, fileBuffer:DWORD, fileSize:DWORD
-                local   h:DWORD
-                local   fileWritten:DWORD
-
-                pushad
-                invoke  CreateFile, [fileName], GENERIC_WRITE, \        ; Открываем файл для записи
-                        0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL
-                mov     [h], eax
-                or      eax, eax
-                jnz     .L1
-                SYSTEMERROR     ActionCreateFile
-                jmp     .fail
-
- .L1:           invoke  WriteFile, [h], [fileBuffer], \                 ; Записываем в файл
-                        [fileSize], addr fileWritten, NULL
-                or      eax, eax
-                jz      .L2
-                mov     eax, [fileWritten]
-                cmp     eax, [fileSize]
-                je      .L3
-                USERERROR       , ErrorWritedNotEqRequested
-                jmp     .fail
-
- .L2:           SYSTEMERROR     ActionWriteFile
-                jmp     .fail
-
- .L3:           invoke  CloseHandle, [h]                                ; Закрываем файл
-                or      eax, eax
-                clc
-                jnz     .return
-                SYSTEMERROR     ActionCloseHandle
-
- .fail:         stc
- .return:       popad
-                ret
-endp
-
 ;==============================================================================;
 ;  MAIN BOLDER                                                                 ;
 ;==============================================================================;
@@ -1103,55 +737,29 @@ proc            SaveMainFiles
                 ret
 endp
 
-                ;
-                ; Вернуть номер текущего лабиринта
-                ;
-                ; OUT   edi = current level index
-                ;
-;proc            GetLevelIndex
-;                mov     edi,[Level]
-;                ret
-;endp
-
-                ;
-                ; Вернуть номер текущего прохождения
-                ;
-                ; OUT   edi = current solve index
-                ;
-;proc            GetDemoIndex
-;                mov     edi,[Level]
-;                add     edi,DEMO_INDEX
-;                ret
-;endp
-
 proc            InstallKeyboard
                 mov     edi, ScanKeyboardMap
                 mov     ecx, 256/4
                 xor     eax, eax
                 rep     stosd
-;                push    es
-;                mov     ax,3509h
-;                int     21h
-;                mov     word [OldInt09],bx
-;                mov     word [OldInt09+2],es
-;                pop     es
-;                mov     ax,2509h
-;                mov     dx,NewInt09
-;                int     21h
                 ret
 endp
 
-;;NewInt09:       push    ax bx
-;;                in      al,60h
-;;                mov     bl,al
-;;                and     bx,7Fh
-;;                mov     ah,TRUE
-;;                or      al,al
-;;                jns     .L1
-;;                mov     ah,FALSE
-;; .L1:           mov     [cs:ScanMap+bx],ah
-;;                pop     bx ax
-;;                jmp     [cs:OldInt09]
+                ; Вернуть код нажатой клавиши (коды считываются в процедуре ProcessMessages)
+                ; Если ScanKeyboardMap[КодКлавиши] = TRUE, то клавиша нажата
+                ; Вернуть 0, если ни одна из клавиш не нажата
+proc            GrabKeyCode uses ebx
+                mov     ebx, ScanKeyboardMap
+                xor     eax, eax
+                ;
+                irp     keycode, VK_LEFT, VK_RIGHT, VK_UP, VK_DOWN, VK_ESCAPE, VK_DELETE
+                {
+                        mov     al, keycode
+                        be      byte [ebx + eax], TRUE, .return
+                }
+                xor     eax, eax
+ .return:       ret
+endp
 
 ;;GrabKeyCode:    push    si cx
 ;;                mov     si,.keys
@@ -1162,14 +770,6 @@ endp
 ;; .keys:         DB      VK_LEFT,VK_RIGHT,VK_UP,VK_DOWN,VK_ESC,VK_DEL
 ;; .size          =       $- .keys
 ;;
-;;GrabKeyCode2:   push    si cx
-;;                mov     si,.keys
-;;                mov     cx,.size
-;;                call    CheckPressed
-;;                pop     cx si
-;;                ret
-;; .keys:         DB      VK_ENTER,VK_0,VK_1,VK_2,VK_3,VK_4,VK_5,VK_6,VK_7
-;; .size          =       $- .keys
 ;;                
 ;;CheckPressed:   push    bx
 ;; .L1:           lodsb
@@ -2340,31 +1940,36 @@ endp
 
 ;=== PLAY LOOP ================================================================
 proc            PlayLoop
-                call    CalculateLevel          ; Подсчет алм. и выч.коор.чел.
+                call    CalculateLevel          ; Подсчет алмазов и вычисление координат героя
                 call    MazeToMazeWork
-;;                be      [GameMode],MODE_DEMO,.L3
-;;                call    InitRecRec              ; Настройка ЗАПИСИ
-;;                jmp     .GameLoop
-;; .L3:           call    InitRecPlay             ; Настройка ВОСПРОИЗВЕДЕНИЯ
-;; .GameLoop:     be      [GameMode],MODE_DEMO,.L0
-;;                mov     cx,1
-;;                call    MakeDelay
-;; .L0:           be      [AlmazesCount],0,.LevelDone
-;;                bne     [GameMode],MODE_DEMO,.L1
-;;                call    GrabKeyCode
-;;                be      ah,VK_ESC,.L2           ; Выход во время демо...
-;;                call    GetRecordedKeyCode
-;;                jmp     .L2
-;; .L1:           call    GrabKeyCode
-;;                call    RecKeyCode
-;; .L2:           mov     [KOD],ax
-;;                be      ah,VK_ESC,.PlayBreak    ; Выход из игры
-;;                call    SKA                     ; ДВИЖЕНИЕ!!!
-;;                bne     [PlayerDie],TRUE,.GameLoop
-;;                be      [KOD],VK_DEL*256,.LevelBreak
-;;                jmp     .PlayerDie
-;; .LevelDone:    be      [GameMode],MODE_DEMO,.L4
-;;                call    RecKeyCodeStop          ; Остановить запись...
+                be      [GameMode],MODE_DEMO,.L3
+                call    InitRecRec              ; Настройка ЗАПИСИ
+                jmp     .GameLoop
+ .L3:           call    InitRecPlay             ; Настройка ВОСПРОИЗВЕДЕНИЯ
+                ;;;
+ .GameLoop:     ; PERFORM DELAY, AND SCAN KEYS
+                stdcall ProcessMessages, PM_EXIT_BY_TIMER, GAME_DELAY
+                ; CHECK TO GAME DONE
+                be      [AlmazesCount],0,.LevelDone
+                ;
+                bne     [GameMode],MODE_DEMO,.L1
+                ; PLAY GAME
+                call    GrabKeyCode
+                be      eax,VK_ESCAPE,.L2       ; Выход во время демо...
+                call    GetRecordedKeyCode      ; ИЗВЛЕЧЬ код нажатой клавиши из демо
+                jmp     .L2
+ .L1:           ; DEMO GAME
+                call    GrabKeyCode
+                call    RecKeyCode              ; ЗАПИСАТЬ код нажатой клавиши в демо
+ .L2:           mov     [KOD],eax
+                ; CHECK PRESSED KEYS
+                be      eax,VK_ESC,.PlayBreak   ; Выход из игры/демо
+                call    SKA                     ; ДВИЖЕНИЕ!!!
+                bne     [PlayerDie],TRUE,.GameLoop
+                be      [KOD],VK_DELETE,.LevelBreak; Прерывание игры (если, например, завалило камнями)
+                jmp     .PlayerDie
+ .LevelDone:    be      [GameMode],MODE_DEMO,.L4
+                call    RecKeyCodeStop          ; Остановить запись...
  .L4:           mov     eax,GAME_LEVEL_DONE     ; УРОВЕНЬ ПРОЙДЕН!!!
                 ret
  .PlayBreak:    mov     eax,GAME_PLAY_BREAK     ; ВЫХОД ИЗ ИГРЫ!!!
@@ -2605,12 +2210,33 @@ endp
 ;;                pop     cx
 ;;                ret
 ;;
-;;                ; Инициализация записывателя
-;;InitRecRec:     mov     ax,RecArray
-;;                mov     [RecAddr],ax
-;;                mov     [RecBegin],ax
-;;                mov     [RecRecCode],-1
-;;                ret
+
+;=== Общие макросы для ЗАПИСИ / ВОСПРОИЗВЕДЕНИЯ ===============================
+macro           DECODE_RLE_KEY          ; decode AL code to AH (count) AL (event)
+{               mov     ah, al
+                shr     ah, 3
+                and     al, 0111b
+}
+
+macro           ENCODE_RLE_KEY          ; encode AH (count) AL (event) to AL
+{               shl     ah, 3
+                and     al, 0111b
+                or      al, ah                
+}
+
+END_RLE_KEY     =       0106h           ; Код самоуничтожения
+
+;=== ЗАПИСЬ игры ==============================================================
+
+                ; Инициализация записывателя
+proc            RecorderInit
+                mov     eax,RecArray
+                mov     [RecPtr],eax
+                mov     [RecSize], 0
+                mov     [RecCode], -1
+                ret
+endp
+
 ;;
 ;;RecToKey:       push    bx
 ;;                mov     bl,al
@@ -2635,30 +2261,6 @@ endp
 ;;                ;       0. 1.     2.       3.       4.        5.      6.
 ;;xlatRec         DB      0, VK_UP, VK_DOWN, VK_LEFT, VK_RIGHT, VK_ESC, VK_DEL
 ;; .size          =       $-xlatRec
-;;
-;;GetRecordedKeyCode:
-;; .L1:           mov     ah,[RecPlayCode]
-;;                mov     al,ah
-;;                and     al,111b         ; AL=код события
-;;                shr     ah,3            ; AH=счетчик
-;;                dec     ah
-;;                jns     .L2
-;;                bne     [RecCount],0,.L3
-;;                mov     al,6
-;;                jmp     .Done
-;; .L3:           push    si
-;;                mov     si,[RecAddr]
-;;                lodsb
-;;                mov     [RecAddr],si
-;;                mov     [RecPlayCode],al
-;;                dec     [RecCount]
-;;                pop     si
-;;                jmp     .L1
-;; .L2:           shl     ah,3
-;;                or      ah,al
-;;                mov     [RecPlayCode],ah
-;; .Done:         call    RecToKey
-;;                ret
 ;;
 ;;                ; Записать код нажатой клавиши (код в AH)
 ;;RecKeyCode:     push    ax bx di
@@ -2700,20 +2302,53 @@ endp
 ;;                ret
 ;;                
 
+;=== ВОСПРОИЗВЕДЕНИЕ записанной игры ==========================================
 
-                ; Инициализация рекордера для воспроизведения...
-proc            InitRecPlay
+                .const
+PlayerEventToKey:      ;0  1      2        3        4         5          6          7
+                db      0, VK_UP, VK_DOWN, VK_LEFT, VK_RIGHT, VK_ESCAPE, VK_DELETE, 0
+
+                .code
+proc            PlayerRead uses esi
+                mov     esi, [RecSize]
+                be      esi, 0, .nodata
+                dec     esi
+                mov     [RecSize], esi
+                ;
+                mov     esi, [RecPtr]
+                movzx   eax, byte [esi]
+                inc     esi
+                mov     [RecPtr], esi
+                ;
+                DECODE_RLE_KEY
+                ret
+ .nodata:       mov     eax, END_RLE_KEY
+                ret
+endp
+
+                ; Инициализация плейера для воспроизведения...
+proc            PlayerInit
                 GET_DEMO_PTR
-                mov     [RecSize],eax
-                mov     [RecPlayCode],1 SHL 3+6
-                be      eax,0,.Done
-                mov     [RecBegin],esi
-                lodsb
-                mov     [RecPlayCode],al
-                mov     [RecPtr],esi
-                xor     eax, eax
-                inc     eax
- .Done:         ret
+                mov     [RecSize], eax
+                call    PlayerRead
+                mov     [RecCode], eax
+                ret
+endp
+
+                ; Вернуть записанную клавишу
+proc            PlayerGetKey
+                mov     eax, [RecCode]                  ; AH = счётчик, AL = код события
+ .L1:           dec     ah
+                jns     .L2
+                call    PlayerRead
+                jmp     .L1
+ .L2:           mov     [RecCode], eax
+
+        !!! А ЕСЛИ ВСЕ КОДЫ ИСПОЛЬЗОВАТЬ НЕ VK_..., А ОТ 0 ДО 7 ??? !!!              
+
+                movzx   eax, al                         ; Преобразовать код события в AL в код клавиши в eax
+                movzx   eax, [eax + PlayerEventToKey]
+                ret
 endp
 
                 ; 

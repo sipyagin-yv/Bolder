@@ -1,0 +1,28 @@
+                FORMAT  PE CONSOLE
+                include "win32wx.inc"
+                ; странно, даже если с помощью if/end if сначала определяем макро, то потом оно "не видно",
+                ; похоже макросы определяются в порядке встречи в тексте, на них не влияют никакие if/end if
+                ; о чем свидетельствует область if %=3/end if, ведь % никогда не равен 3
+
+                repeat  2
+                if % = 3
+macro           CLEARERROR
+{
+                mov     eax, -1
+}
+                end if
+                
+                if % = 2
+                display 'define proc start',13,10
+proc            start
+                CLEARERROR
+                ret
+endp
+                end if
+
+                if % = 1
+                display 'define macro CLEARERROR',13,10
+                end if
+
+                end repeat
+                .end    start

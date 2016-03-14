@@ -1,0 +1,13 @@
+                format  PE CONSOLE
+                include "win32wx.inc"
+
+
+proc            start
+                irps     keycode, VK_LEFT VK_RIGHT VK_UP VK_DOWN VK_ESCAPE VK_DELETE
+                {
+                        mov     al, keycode
+                }
+endp
+
+                .end    start
+                                
