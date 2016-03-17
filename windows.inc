@@ -1,26 +1,26 @@
                 .udata
-                ; Структура для определения рабочего экрана 
-                ; (аналог консоли, но свой, со своими символами)
+                ; РЎС‚СЂСѓРєС‚СѓСЂР° РґР»СЏ РѕРїСЂРµРґРµР»РµРЅРёСЏ СЂР°Р±РѕС‡РµРіРѕ СЌРєСЂР°РЅР° 
+                ; (Р°РЅР°Р»РѕРі РєРѕРЅСЃРѕР»Рё, РЅРѕ СЃРІРѕР№, СЃРѕ СЃРІРѕРёРјРё СЃРёРјРІРѕР»Р°РјРё)
                 ; 
-                ; Существует 3 экрана:
-                ;   1. scr.screen      - Экран программы (текстовый)
-                ;   2. scr.cachescreen - Экран программы, кешированный (текстовый)
-                ;   3. scr.vmem        - Экран вывода (графический)
+                ; РЎСѓС‰РµСЃС‚РІСѓРµС‚ 3 СЌРєСЂР°РЅР°:
+                ;   1. scr.screen      - Р­РєСЂР°РЅ РїСЂРѕРіСЂР°РјРјС‹ (С‚РµРєСЃС‚РѕРІС‹Р№)
+                ;   2. scr.cachescreen - Р­РєСЂР°РЅ РїСЂРѕРіСЂР°РјРјС‹, РєРµС€РёСЂРѕРІР°РЅРЅС‹Р№ (С‚РµРєСЃС‚РѕРІС‹Р№)
+                ;   3. scr.vmem        - Р­РєСЂР°РЅ РІС‹РІРѕРґР° (РіСЂР°С„РёС‡РµСЃРєРёР№)
 struct          Scr
-enable          rd      1                               ; =0 - рисование запрещено; >0 - рисование разрешено
-dc              rd      1                               ; Контекст для рисования
-dib             rd      1                               ; Bitmap для рисования
-vmem            rd      1                               ; Битовые данные Bitmap(dib)
-pixels          POINT                                   ; Размеры экрана в пикселах
-chars           POINT                                   ; Размеры экрана в символах
-pitch           rd      1                               ; Размер скан-строки, в байтах
-screen          rw      SCREEN_WIDTH*SCREEN_HEIGHT      ; Рабочий экран
-cachescreen     rw      SCREEN_WIDTH*SCREEN_HEIGHT      ; Экран, с нарисованными в mem символами
-translADDR      rd      SCREEN_WIDTH*SCREEN_HEIGHT      ; Таблица для вычисления адреса по смещению символа
-translCH        rd      256                             ; Таблица для вычисления адреса маски символа
-palitre         rd      16                              ; Палитра
-bih             BITMAPINFOHEADER                        ; Информация о картинке (vmem - адрес битовых данных картинки)
-fontdata2       db      256*CHAR_HEIGHT dup(?)          ; "Распакованный" шрифт
+enable          rd      1                               ; =0 - СЂРёСЃРѕРІР°РЅРёРµ Р·Р°РїСЂРµС‰РµРЅРѕ; >0 - СЂРёСЃРѕРІР°РЅРёРµ СЂР°Р·СЂРµС€РµРЅРѕ
+dc              rd      1                               ; РљРѕРЅС‚РµРєСЃС‚ РґР»СЏ СЂРёСЃРѕРІР°РЅРёСЏ
+dib             rd      1                               ; Bitmap РґР»СЏ СЂРёСЃРѕРІР°РЅРёСЏ
+vmem            rd      1                               ; Р‘РёС‚РѕРІС‹Рµ РґР°РЅРЅС‹Рµ Bitmap(dib)
+pixels          POINT                                   ; Р Р°Р·РјРµСЂС‹ СЌРєСЂР°РЅР° РІ РїРёРєСЃРµР»Р°С…
+chars           POINT                                   ; Р Р°Р·РјРµСЂС‹ СЌРєСЂР°РЅР° РІ СЃРёРјРІРѕР»Р°С…
+pitch           rd      1                               ; Р Р°Р·РјРµСЂ СЃРєР°РЅ-СЃС‚СЂРѕРєРё, РІ Р±Р°Р№С‚Р°С…
+screen          rw      SCREEN_WIDTH*SCREEN_HEIGHT      ; Р Р°Р±РѕС‡РёР№ СЌРєСЂР°РЅ
+cachescreen     rw      SCREEN_WIDTH*SCREEN_HEIGHT      ; Р­РєСЂР°РЅ, СЃ РЅР°СЂРёСЃРѕРІР°РЅРЅС‹РјРё РІ mem СЃРёРјРІРѕР»Р°РјРё
+translADDR      rd      SCREEN_WIDTH*SCREEN_HEIGHT      ; РўР°Р±Р»РёС†Р° РґР»СЏ РІС‹С‡РёСЃР»РµРЅРёСЏ Р°РґСЂРµСЃР° РїРѕ СЃРјРµС‰РµРЅРёСЋ СЃРёРјРІРѕР»Р°
+translCH        rd      256                             ; РўР°Р±Р»РёС†Р° РґР»СЏ РІС‹С‡РёСЃР»РµРЅРёСЏ Р°РґСЂРµСЃР° РјР°СЃРєРё СЃРёРјРІРѕР»Р°
+palitre         rd      16                              ; РџР°Р»РёС‚СЂР°
+bih             BITMAPINFOHEADER                        ; РРЅС„РѕСЂРјР°С†РёСЏ Рѕ РєР°СЂС‚РёРЅРєРµ (vmem - Р°РґСЂРµСЃ Р±РёС‚РѕРІС‹С… РґР°РЅРЅС‹С… РєР°СЂС‚РёРЅРєРё)
+fontdata2       db      256*CHAR_HEIGHT dup(?)          ; "Р Р°СЃРїР°РєРѕРІР°РЅРЅС‹Р№" С€СЂРёС„С‚
 ends
 scr             Scr
 
@@ -32,12 +32,12 @@ DIB_RGB_COLORS          =       0
 ;ERROR_FILE_NOT_FOUND    =       2
 
                 .const
-                ; Сообщения об ошибках
+                ; РЎРѕРѕР±С‰РµРЅРёСЏ РѕР± РѕС€РёР±РєР°С…
 ErrorCreateMainClass    du      'Can''t register window class', 0
 ErrorCreateMainWindow   du      'Can''t create window', 0
 ErrorCreateImageDC      du      'Can''t create image (DC)', 0
 ErrorCreateImageDIB     du      'Can''t create image (DIB)', 0
-                ; Проводимые действия
+                ; РџСЂРѕРІРѕРґРёРјС‹Рµ РґРµР№СЃС‚РІРёСЏ
 ActionRegisterClass     du      'Register class', 0
 ActionCreateWindow      du      'Create window', 0
 ActionCreateCompDC      du      'Create compatible DC', 0
@@ -53,19 +53,19 @@ proc            CreateScreen    wchar:DWORD, hchar:DWORD
                 ;
                 mov     eax, [wchar]
                 mov     [scr.chars.x], eax
-                imul    eax, CHAR_WIDTH         ; Ширина символа
+                imul    eax, CHAR_WIDTH         ; РЁРёСЂРёРЅР° СЃРёРјРІРѕР»Р°
                 mov     [scr.pixels.x], eax
                 ;
                 mov     eax, [hchar]
                 mov     [scr.chars.y], eax
-                imul    eax, CHAR_HEIGHT        ; Высота символа
+                imul    eax, CHAR_HEIGHT        ; Р’С‹СЃРѕС‚Р° СЃРёРјРІРѕР»Р°
                 mov     [scr.pixels.y], eax
                 ;
                 mov     eax, [scr.pixels.x]
-                shl     eax, 2                  ; "размер" одного пиксела - 4 байта: "0 R G B"
+                shl     eax, 2                  ; "СЂР°Р·РјРµСЂ" РѕРґРЅРѕРіРѕ РїРёРєСЃРµР»Р° - 4 Р±Р°Р№С‚Р°: "0 R G B"
                 mov     [scr.pitch], eax
                 ;
-                ; Создать DC
+                ; РЎРѕР·РґР°С‚СЊ DC
                 ;
                 invoke  CreateCompatibleDC, 0
                 mov     [scr.dc], eax
@@ -76,7 +76,7 @@ proc            CreateScreen    wchar:DWORD, hchar:DWORD
                 stdcall ShowError, ErrorCreateImageDC, 0, 0
 
  .L1:           ;
-                ; Создать bitmap, для рисования и вывода в окно
+                ; РЎРѕР·РґР°С‚СЊ bitmap, РґР»СЏ СЂРёСЃРѕРІР°РЅРёСЏ Рё РІС‹РІРѕРґР° РІ РѕРєРЅРѕ
                 ;
                 invoke  RtlZeroMemory, scr.bih, sizeof.BITMAPINFOHEADER
                 lea     edx, [scr.bih]
@@ -86,7 +86,7 @@ proc            CreateScreen    wchar:DWORD, hchar:DWORD
                 mov     [edx + BITMAPINFOHEADER.biWidth], eax
                 ;
                 mov     eax, [scr.pixels.y]
-                neg     eax                             ; top-down, т.е. начало блока памяти - левый-верхний пиксел
+                neg     eax                             ; top-down, С‚.Рµ. РЅР°С‡Р°Р»Рѕ Р±Р»РѕРєР° РїР°РјСЏС‚Рё - Р»РµРІС‹Р№-РІРµСЂС…РЅРёР№ РїРёРєСЃРµР»
                 mov     [edx + BITMAPINFOHEADER.biHeight], eax
                 ;
                 mov     [edx + BITMAPINFOHEADER.biPlanes], 1
@@ -112,16 +112,16 @@ proc            CreateScreen    wchar:DWORD, hchar:DWORD
                 stdcall ShowError, ErrorCreateImageDIB, 0, 0
 
  .L2:           ;
-                ; Установить размеры клиентской части окна 
-                ; (вначале размер клиентской части равен размеру экрана)
+                ; РЈСЃС‚Р°РЅРѕРІРёС‚СЊ СЂР°Р·РјРµСЂС‹ РєР»РёРµРЅС‚СЃРєРѕР№ С‡Р°СЃС‚Рё РѕРєРЅР° 
+                ; (РІРЅР°С‡Р°Р»Рµ СЂР°Р·РјРµСЂ РєР»РёРµРЅС‚СЃРєРѕР№ С‡Р°СЃС‚Рё СЂР°РІРµРЅ СЂР°Р·РјРµСЂСѓ СЌРєСЂР°РЅР°)
                 ;
                 stdcall SetClientSize, [MainWindow], [scr.pixels.x], [scr.pixels.y]
                 ;
-                ; Распаковка шрифта
+                ; Р Р°СЃРїР°РєРѕРІРєР° С€СЂРёС„С‚Р°
                 ;
                 call    PrepareFont
                 ;
-                ; Создать перекодировочную таблицу для вычисления адреса экрана
+                ; РЎРѕР·РґР°С‚СЊ РїРµСЂРµРєРѕРґРёСЂРѕРІРѕС‡РЅСѓСЋ С‚Р°Р±Р»РёС†Сѓ РґР»СЏ РІС‹С‡РёСЃР»РµРЅРёСЏ Р°РґСЂРµСЃР° СЌРєСЂР°РЅР°
                 ; addr = y * CHAR_HEIGHT * scr.pixels.x + x * CHAR_WIDTH
                 ; offset = pixel * 4 + scr.mem
                 ;
@@ -129,7 +129,7 @@ proc            CreateScreen    wchar:DWORD, hchar:DWORD
                 mov     ebx, 0                  ; for(y=0; y<scr.chars.y; y++)
                 ;
 .LoopY:         mov     ecx, 0                  ; for(x=0; x<scr.chars.x; x++)
-                imul    eax, ebx, CHAR_HEIGHT   ; вынос подвыражения (y * CHAR_HEIGHT * scr.pixels.x) за пределы цикла
+                imul    eax, ebx, CHAR_HEIGHT   ; РІС‹РЅРѕСЃ РїРѕРґРІС‹СЂР°Р¶РµРЅРёСЏ (y * CHAR_HEIGHT * scr.pixels.x) Р·Р° РїСЂРµРґРµР»С‹ С†РёРєР»Р°
                 imul    eax, [scr.pixels.x]
                 ;
 .LoopX:         imul    edx, ecx, CHAR_WIDTH
@@ -142,7 +142,7 @@ proc            CreateScreen    wchar:DWORD, hchar:DWORD
                 loopb   ecx, [scr.chars.x], .LoopX
                 loopb   ebx, [scr.chars.y], .LoopY
                 ;
-                ; Создать перекодировочную таблицу для вычисления адреса символа
+                ; РЎРѕР·РґР°С‚СЊ РїРµСЂРµРєРѕРґРёСЂРѕРІРѕС‡РЅСѓСЋ С‚Р°Р±Р»РёС†Сѓ РґР»СЏ РІС‹С‡РёСЃР»РµРЅРёСЏ Р°РґСЂРµСЃР° СЃРёРјРІРѕР»Р°
                 ;
                 xor     ecx, ecx                ; for(ecx=0; ecx<256; ecx++)
  .tr2:          imul    eax, ecx, CHAR_HEIGHT
@@ -151,7 +151,7 @@ proc            CreateScreen    wchar:DWORD, hchar:DWORD
                 inc     cl
                 jnz     .tr2
                 ;
-                ; Инициализация экранов
+                ; РРЅРёС†РёР°Р»РёР·Р°С†РёСЏ СЌРєСЂР°РЅРѕРІ
                 ;
                 lea     edi, [scr.screen]
                 mov     ecx, SCREEN_WIDTH*SCREEN_HEIGHT
@@ -160,21 +160,21 @@ proc            CreateScreen    wchar:DWORD, hchar:DWORD
                 ;
                 lea     edi, [scr.cachescreen]
                 mov     ecx, SCREEN_WIDTH*SCREEN_HEIGHT
-                not     ax                      ; Чтобы в первый раз перерисовать в scr.vmem весь экран
+                not     ax                      ; Р§С‚РѕР±С‹ РІ РїРµСЂРІС‹Р№ СЂР°Р· РїРµСЂРµСЂРёСЃРѕРІР°С‚СЊ РІ scr.vmem РІРµСЃСЊ СЌРєСЂР°РЅ
                 rep     stosw
                 ;
-                ; Подготовка палитры по умолчанию
+                ; РџРѕРґРіРѕС‚РѕРІРєР° РїР°Р»РёС‚СЂС‹ РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ
                 ;
                 lea     esi, [defaultpalitre]
                 lea     edi, [scr.palitre]
                 mov     ecx, 16
                 rep     movsd
                 ;
-                ; Разрешаем рисование
+                ; Р Р°Р·СЂРµС€Р°РµРј СЂРёСЃРѕРІР°РЅРёРµ
                 ;
                 mov     [scr.enable], -1
                 ;
-                ; Показать то, что скрыто
+                ; РџРѕРєР°Р·Р°С‚СЊ С‚Рѕ, С‡С‚Рѕ СЃРєСЂС‹С‚Рѕ
                 ;
                 invoke  ShowWindow, [MainWindow], SW_SHOWNORMAL
                 ret
@@ -193,7 +193,7 @@ proc            CreateMainWindow
                 mov     [MainWindow], eax
                 mov     [MainWindowClass], eax
                 ;
-                ; Регистрация класса
+                ; Р РµРіРёСЃС‚СЂР°С†РёСЏ РєР»Р°СЃСЃР°
                 ;
                 invoke  RtlZeroMemory, addr wc, sizeof.WNDCLASS
                 ;
@@ -207,10 +207,10 @@ proc            CreateMainWindow
 
                 ;;mov     [wc.hIcon], NULL                ; NULL, no icon
 
-                invoke  LoadCursor, 0, IDC_ARROW        ; Загружаем курсор по умолчанию
+                invoke  LoadCursor, 0, IDC_ARROW        ; Р—Р°РіСЂСѓР¶Р°РµРј РєСѓСЂСЃРѕСЂ РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ
                 mov     [wc.hCursor], eax
 
-                ;;mov     [wc.hbrBackground], 0           ; =0, значит приложение само рисует клиентскую часть
+                ;;mov     [wc.hbrBackground], 0           ; =0, Р·РЅР°С‡РёС‚ РїСЂРёР»РѕР¶РµРЅРёРµ СЃР°РјРѕ СЂРёСЃСѓРµС‚ РєР»РёРµРЅС‚СЃРєСѓСЋ С‡Р°СЃС‚СЊ
                 ;;mov     [wc.lpszMenuName], NULL         ; NULL, no menu
                 mov     [wc.lpszClassName], MainWindowClassName
 
@@ -223,7 +223,7 @@ proc            CreateMainWindow
                 stdcall ShowError, ErrorCreateMainClass, 1
                 
  .L1:           ;
-                ; Создание главного окна (но пока не показываем его)
+                ; РЎРѕР·РґР°РЅРёРµ РіР»Р°РІРЅРѕРіРѕ РѕРєРЅР° (РЅРѕ РїРѕРєР° РЅРµ РїРѕРєР°Р·С‹РІР°РµРј РµРіРѕ)
                 ;
                 invoke  CreateWindowEx, \
                         WS_EX_OVERLAPPEDWINDOW, \
@@ -252,20 +252,20 @@ endp
 proc            SetClientSize   hWnd:DWORD, clientWidth:DWORD, clientHeight:DWORD
                 local   clientRect:RECT
                 local   windowRect:RECT
-                ; Определяем размеры клиентской части окна
+                ; РћРїСЂРµРґРµР»СЏРµРј СЂР°Р·РјРµСЂС‹ РєР»РёРµРЅС‚СЃРєРѕР№ С‡Р°СЃС‚Рё РѕРєРЅР°
                 invoke  GetClientRect, [MainWindow], addr clientRect
-                ; Определяем размеры окна
+                ; РћРїСЂРµРґРµР»СЏРµРј СЂР°Р·РјРµСЂС‹ РѕРєРЅР°
                 invoke  GetWindowRect, [MainWindow], addr windowRect
-                ; Т.к. функции установки размеров клиентской части окна нет, то делаем следующее:
-                ; нужно вычислить размер бордюров и прочих элементов, для этого нужно 
-                ; от текущих размеров окна вычесть размер клиентской части, 
+                ; Рў.Рє. С„СѓРЅРєС†РёРё СѓСЃС‚Р°РЅРѕРІРєРё СЂР°Р·РјРµСЂРѕРІ РєР»РёРµРЅС‚СЃРєРѕР№ С‡Р°СЃС‚Рё РѕРєРЅР° РЅРµС‚, С‚Рѕ РґРµР»Р°РµРј СЃР»РµРґСѓСЋС‰РµРµ:
+                ; РЅСѓР¶РЅРѕ РІС‹С‡РёСЃР»РёС‚СЊ СЂР°Р·РјРµСЂ Р±РѕСЂРґСЋСЂРѕРІ Рё РїСЂРѕС‡РёС… СЌР»РµРјРµРЅС‚РѕРІ, РґР»СЏ СЌС‚РѕРіРѕ РЅСѓР¶РЅРѕ 
+                ; РѕС‚ С‚РµРєСѓС‰РёС… СЂР°Р·РјРµСЂРѕРІ РѕРєРЅР° РІС‹С‡РµСЃС‚СЊ СЂР°Р·РјРµСЂ РєР»РёРµРЅС‚СЃРєРѕР№ С‡Р°СЃС‚Рё, 
                 ; w = windowRect.Right-windowRect.Left-clientRect.right
                 ; h = windowRect.Bottom-windowRect.Top-clientRect.bottom
-                ; и прибавить к w новый размер клиентской части
+                ; Рё РїСЂРёР±Р°РІРёС‚СЊ Рє w РЅРѕРІС‹Р№ СЂР°Р·РјРµСЂ РєР»РёРµРЅС‚СЃРєРѕР№ С‡Р°СЃС‚Рё
                 ; w += clientWidth
                 ; h += clientHeigh
-                ; Полученные значения w, h есть размеры окна, у которого размер клиентской части
-                ; будет clientWidth, clientHeight
+                ; РџРѕР»СѓС‡РµРЅРЅС‹Рµ Р·РЅР°С‡РµРЅРёСЏ w, h РµСЃС‚СЊ СЂР°Р·РјРµСЂС‹ РѕРєРЅР°, Сѓ РєРѕС‚РѕСЂРѕРіРѕ СЂР°Р·РјРµСЂ РєР»РёРµРЅС‚СЃРєРѕР№ С‡Р°СЃС‚Рё
+                ; Р±СѓРґРµС‚ clientWidth, clientHeight
                 mov     eax, [windowRect.right]
                 sub     eax, [windowRect.left]
                 sub     eax, [clientRect.right]
@@ -281,6 +281,6 @@ proc            SetClientSize   hWnd:DWORD, clientWidth:DWORD, clientHeight:DWOR
                         0, \                            ; not used
                         0, 0, \                         ; not used
                         eax, ebx, \                     ; new width and height
-                        SWP_NOMOVE + SWP_NOZORDER       ; меняем только размеры окна!
+                        SWP_NOMOVE + SWP_NOZORDER       ; РјРµРЅСЏРµРј С‚РѕР»СЊРєРѕ СЂР°Р·РјРµСЂС‹ РѕРєРЅР°!
                 ret
 endp

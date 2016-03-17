@@ -1,6 +1,7 @@
 ﻿size 16 * 12 = 192 bytes
 bits by bits = 192 * 3 = 576 bits = 72 (48h) bytes
 
-200 levels = 200 * 192 = 38400 bytes
-200 levels RLE = 200 * 72 = 14400 bytes (37% from uncompressed)
+200 levels = 200 * 192 = 38400 bytes (100% from uncompressed)
+200 levels bits by bits = 200 * 72 = 14400 bytes (37% from uncompressed)
+200 levels AC = 200 * ~44 = 8725 bytes (23% from uncompressed)
 

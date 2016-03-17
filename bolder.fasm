@@ -54,10 +54,10 @@ INIT_LIVES      =       5               ; Начальные попытки
 INIT_SCORE      =       0               ; Начальные очки
 
                 ; ЧЕМ ЗАКОНЧИЛАСЬ ИГРА
-GAME_LEVEL_DONE =       0
-GAME_PLAY_BREAK =       1
-GAME_LEVEL_BREAK=       2
-GAME_PLAYER_DIE =       3
+GAME_LEVEL_DONE =       0               ; Уровень пройден
+GAME_PLAY_BREAK =       1               ; Закончили игру
+GAME_LEVEL_BREAK=       2               ; Перезапуск уровня
+GAME_HERO_DIE   =       3               ; Герой погиб
 
                 ; РЕЖИМ РАБОТЫ
 MODE_MENU       =       0               ; Режим меню
@@ -68,12 +68,22 @@ MODE_EDIT       =       4               ; Режим редактировани�
 MODE_TEST       =       5               ; Тестовая игра (только текущ.лабиринт)
 MODE_DEMO       =       6               ; Демонстрационная игра
 
+                ; СОБЫТИЯ КЛАВИАТУРЫ
+KBD_NONE        =       0               ; Клавиша не нажата
+KBD_MOVE_LEFT   =       1
+KBD_MOVE_RIGHT  =       2
+KBD_MOVE_UP     =       3
+KBD_MOVE_DOWN   =       4
+KBD_ESCAPE      =       5
+KBD_DESTRUCT    =       6
+
+                ; Команды для вывода текстов
 _XY             =       -1              ; Перемещение курсора ( _XY, <x>|_MEM|_IGN, <y>|_MEM|_IGN )
 _ATTR           =       -2              ; Установка атрибут текста ( _ATTR, <attr> )
 _SUBSTR         =       -3              ; Показать подстроку ( _SUBS, <index> )
 _END            =       0               ; Конец текста ( _END )
-_MEM            =       -3              ; Для команды _XY, извлечь координату из ячейки памяти
-_IGN            =       -4              ; Для команды _XY, не изменять соответствующую координату
+_XY_MEM         =       -4              ; Для команды _XY, извлечь координату из ячейки памяти
+_XY_IGN         =       -5              ; Для команды _XY, не изменять соответствующую координату
 
 ;=== CONST ====================================================================
                 .const
@@ -187,16 +197,16 @@ SPRT:           DB      07h, 20h,20h,20h,20h,20h,20h,20h,20h;00       - пуст
                 DB      0Fh, 04h,4Fh,10h,20h,14h,03h,14h,20h;05       - человечек (грызет алмазы)    
                 DB      0Ah, 23h,23h,23h,20h,23h,23h,23h,20h;06       - звери (охотятся на человечка)
                 DB      0Ch, 17h,17h,17h,17h,17h,17h,17h,17h;07       - бетон (неуничтожаемый)       
-                ; Спрайты - движение
-                DB      0Bh, 2Fh,2Ah,5Ch,20h,5Ch,2Ah,2Fh,20h;08
-                DB      07h, 20h,20h,20h,20h,20h,20h,20h,20h;09
-                DB      0Bh, 5Ch,2Ah,2Fh,20h,20h,20h,20h,20h;10       - алмаз падает вниз (11,10)
-                DB      0Bh, 20h,20h,20h,20h,2Fh,2Ah,5Ch,20h;11
-                DB      07h, 20h,20h,20h,20h,20h,20h,20h,20h;12
-                DB      07h, 20h,20h,20h,20h,20h,20h,20h,20h;13
-                DB      07h, 20h,20h,20h,20h,20h,20h,20h,20h;14
-                DB      0Fh, 02h,03h,03h,20h,20h,20h,20h,20h;15       - камень падает вниз (16,15)
-                DB      0Fh, 20h,20h,20h,20h,16h,17h,17h,10h;16
+                ; Спрайты - движение камней и алмазов
+                DB      0Bh, 2Fh,2Ah,5Ch,20h,5Ch,2Ah,2Fh,20h;08       - алмаз (где используется, неясно)
+                DB      07h, 20h,20h,20h,20h,20h,20h,20h,20h;09       - пустота
+                DB      0Bh, 5Ch,2Ah,2Fh,20h,20h,20h,20h,20h;10       - алмаз падает вниз (10)
+                DB      0Bh, 20h,20h,20h,20h,2Fh,2Ah,5Ch,20h;11       - алмаз падает вниз (11)
+                DB      07h, 20h,20h,20h,20h,20h,20h,20h,20h;12       - пустота
+                DB      07h, 20h,20h,20h,20h,20h,20h,20h,20h;13       - пустота
+                DB      07h, 20h,20h,20h,20h,20h,20h,20h,20h;14       - пустота
+                DB      0Fh, 02h,03h,03h,20h,20h,20h,20h,20h;15       - камень падает вниз (15)
+                DB      0Fh, 20h,20h,20h,20h,16h,17h,17h,10h;16       - камень падает вниз (16)
                 ; Спрайты человечка
                 DB      0Fh, 04h,4Fh,10h,20h,14h,03h,1Ch,20h;17
                 DB      0Fh, 1Ch,03h,14h,20h,20h,20h,20h,20h;18
@@ -284,18 +294,18 @@ SPRT:           DB      07h, 20h,20h,20h,20h,20h,20h,20h,20h;00       - пуст
  .size          =       $-SPRT
 
                 ; Начальная заставка
-GameTitle:      DB      0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0                 ; 1
-                DB      82,88,83,0,0,0,91,0,0,0,91,0,0,0,0,0            ; 2
-                DB      82,85,87,81,85,0,91,0,81,85,91,81,85,0,83,83    ; 3
-                DB      82,0,91,91,0,91,91,0,91,0,91,93,85,87,92,0      ; 4
-                DB      82,85,87,89,85,87,89,83,89,84,91,89,85,83,91,0  ; 5
-                DB      0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0                 ; 6
+GameTitle:      DB      00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00 ; 1
+                DB      82,88,83,00,00,00,91,00,00,00,91,00,00,00,00,00 ; 2
+                DB      82,85,87,81,85,00,91,00,81,85,91,81,85,00,83,83 ; 3
+                DB      82,00,91,91,00,91,91,00,91,00,91,93,85,87,92,00 ; 4
+                DB      82,85,87,89,85,87,89,83,89,84,91,89,85,83,91,00 ; 5
+                DB      00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00 ; 6
                 DB      88,88,88,88,88,88,88,88,88,88,88,88,88,88,88,88 ; 7
-                DB      0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0                 ; 8
-                DB      0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0                 ; 9
-                DB      0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0                 ; 10
-                DB      0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0                 ; 11
-                DB      0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0                 ; 12
+                DB      00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00 ; 8
+                DB      00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00 ; 9
+                DB      00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00 ; 10
+                DB      00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00 ; 11
+                DB      00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00 ; 12
 
                 ; Экран с информацией об очках и жизнях
 GameScore:      DB      4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4                 ; 1
@@ -323,7 +333,7 @@ TXTMenuSelector:DB      _ATTR,00h
                 DB      _XY,31,20,'   '                 ; # 1
                 DB      _XY,31,22,'   '                 ; # 2
                 DB      _XY,31,24,'   '                 ; # 3
-                DB      _ATTR,0Ah,_XY,31,_MEM,'-->',0CH,_END
+                DB      _ATTR,0Ah,_XY,31,_XY_MEM,'-->',0CH,_END
                 ;
 LEVTXT:         DB      _ATTR,0Eh,_XY,28,1,'LEVEL: ',_ATTR,0Fh,_SUBSTR,0,_END
 SCOTXT:         DB      _ATTR,0Eh,_XY,60,1,'SCORE: ',_ATTR,0Fh,_SUBSTR,1,_END
@@ -357,11 +367,11 @@ Popitk          RB      1
 OBK             RD      1               ; Очки
 PSK             RB      1
 ScrollArea      RB      16*12*2
-SoundsCount     RW      1
+SoundsCount     RD      1
 HeroDie         RB      1               ; Флаг дохлого человечка
 Maze            RB      16*12           ; Тут наш лабиринт
                 RB      16              ; Кирпичи, чтобы камни не проваливались
-MazeWork        RB      (16+2)*(12+2)
+;;;MazeWork        RB      (16+2)*(12+2)
                 ;
 struct          Record
 ptr             rd      1
@@ -383,7 +393,7 @@ record          Record
 ;   7 - код не используется
 RecPtr          RD      1               ; Текущий адрес записи/воспроизведения
 RecSize         RD      1               ; Длина записи
-RecCode         RB      1               ; Текущие данные для записи/воспроизведения
+RecCode         RD      1               ; Текущие данные для записи/воспроизведения
 RecArray        RB      REC_AREA_SIZE   ; Массив записи
                 ;
 tmp_level_data  RB      256
@@ -745,20 +755,29 @@ proc            InstallKeyboard
                 ret
 endp
 
+                .data
+game_keys:      db      VK_LEFT,       VK_RIGHT,       VK_UP,       VK_DOWN,       VK_ESCAPE,  VK_DELETE,    0
+                .const
+game_events:    db      KBD_MOVE_LEFT, KBD_MOVE_RIGHT, KBD_MOVE_UP, KBD_MOVE_DOWN, KBD_ESCAPE, KBD_DESTRUCT, KBD_NONE
+                .code
                 ; Вернуть код нажатой клавиши (коды считываются в процедуре ProcessMessages)
                 ; Если ScanKeyboardMap[КодКлавиши] = TRUE, то клавиша нажата
-                ; Вернуть 0, если ни одна из клавиш не нажата
-proc            GrabKeyCode uses ebx
-                mov     ebx, ScanKeyboardMap
+                ; Вернуть KBD_NONE, если ни одна из клавиш не нажата
+                ; Иначе возвращаем код клавиши в игровой кодировке (KBD_xxxx)
+                ; IN    -
+                ; OUT   eax = pressed key, or KBD_NONE if no keys pressed
+proc            GrabKeyCode uses esi
                 xor     eax, eax
-                ;
-                irp     keycode, VK_LEFT, VK_RIGHT, VK_UP, VK_DOWN, VK_ESCAPE, VK_DELETE
-                {
-                        mov     al, keycode
-                        be      byte [ebx + eax], TRUE, .return
-                }
-                xor     eax, eax
- .return:       ret
+                xor     esi, esi
+ .Loop:         mov     al, [esi + game_keys]                   ; Get key code
+                or      eax, eax
+                jz      .done
+                cmp     [eax + ScanKeyboardMap], TRUE           ; Key pressed ?
+                je      .done
+                inc     esi
+                jmp     .Loop
+ .done:         mov     al, [esi + game_events]                 ; Key pressed, get game-code
+                ret                
 endp
 
 ;;GrabKeyCode:    push    si cx
@@ -948,8 +967,8 @@ endp
 macro           CHG_COORD       reg, mem
 {
                 local   .done, .setmem
-                be      al, _IGN, .done
-                be      al, _MEM, .setmem
+                be      al, _XY_IGN, .done
+                be      al, _XY_MEM, .setmem
                 mov     reg, al
                 jmp     .done
  .setmem:       mov     reg, mem
@@ -959,10 +978,10 @@ macro           CHG_COORD       reg, mem
 proc            DrawTextBolder uses   eax edx esi
                 push    dword -1
  .Loop:         lodsb
-                be      al,_END,.endtxt
-                be      al,_XY,.xy
-                be      al,_ATTR,.attr
-                be      al,_SUBSTR,.subs
+                switch  al, _END, .endtxt, \
+                            _XY, .xy,      \
+                            _ATTR, .attr,  \
+                            _SUBSTR, .subs
                 call    DrawCharBolder
                 inc     dl
                 jmp     .Loop
@@ -1094,14 +1113,14 @@ proc            DrawStatusBar
                 ret
 endp
 
-;;
-;;MakeSoundEffects:
-;;                mov     cx,[SoundsCount]
-;;                jcxz    .LE
-;; .L3:           call    SOO
-;;                loop    .L3
-;; .LE:           ret
-;;
+
+proc            MakeSoundEffects
+                mov     ecx,[SoundsCount]
+                jcxz    .LE
+ .L3:           call    SOO
+                loop    .L3
+ .LE:           ret
+endp
 
                 ; Draw frame 66 * 26 (permanent stay on the screen)
 proc            DrawFrameBolder
@@ -1224,582 +1243,591 @@ proc            DrawLevel       mazeAddr:DWORD
                 ret
 endp
 
-;;
-;;                ; ОБРАБОТКА ЛАБИРИНТА!!!
-;;SKA:            mov     [PSK],0         ; Флаг движения
-;;                mov     [PlayerDie],FALSE
-;;                mov     [SoundsCount],0 ; Кол-во звуковых эффектов
-;;                mov     si,Maze+191     ; HL = Maze+191, DE = Maze+191 + 16
-;;                mov     bh,MAZE_WIDTH   ; B
-;;                mov     bl,MAZE_HEIGHT  ; C
-;;SKNXT:          mov     al,[si]
-;;                cmp     al,41
-;;                ja      SR12
-;;                movzx   di,al
-;;                add     di,di
-;;                jmp     [di+SwitchTable]
-;;SwitchTable     dw      SR12    ; 00 =Пустота
-;;                dw      SM1     ; 01 =Камень - падает, скатывается
-;;                dw      SM2     ; 02 =Алмаз - падает, скатывается
-;;                dw      SR12    ; 03 =Песок
-;;                dw      SR12    ; 04 =Стены
-;;                dw      UPR     ; 05 =Человечек - передвигается
-;;                dw      SM6     ; 06
-;;                dw      SR12    ; 07
-;;                dw      SM8     ; 08
-;;                dw      SR12    ; 09
-;;                dw      SR12    ; 10
-;;                dw      SM11    ; 11
-;;                dw      SR12    ; 12
-;;                dw      SR12    ; 13
-;;                dw      SR12    ; 14
-;;                dw      SR12    ; 15
-;;                dw      SM16    ; 16
-;;                dw      UPR     ; 17
-;;                dw      SR12    ; 18
-;;                dw      SM19    ; 19
-;;                dw      SM20    ; 20
-;;                dw      SM21    ; 21
-;;                dw      SR12    ; 22
-;;                dw      SM23    ; 23
-;;                dw      UPR     ; 24
-;;                dw      SR12    ; 25
-;;                dw      SM26    ; 26
-;;                dw      UPR     ; 27
-;;                dw      SM28    ; 28
-;;                dw      SM29    ; 29
-;;                dw      SM30    ; 30
-;;                dw      SR12    ; 31
-;;                dw      SR12    ; 32
-;;                dw      SM33    ; 33
-;;                dw      SM34    ; 34
-;;                dw      SR12    ; 35
-;;                dw      SM36    ; 36
-;;                dw      SM37    ; 37
-;;                dw      SM38    ; 38
-;;                dw      SM39    ; 39
-;;                dw      SM40    ; 40
-;;                dw      SM41    ; 41
-;;SR12:           dec     si   
-;;SR14:           dec     bh   
-;;                jnz     SKNXT
-;;                mov     bh,16
-;;                dec     bl
-;;                jnz     SKNXT
-;;                call    MakeSoundEffects
-;;                call    DrawLevel
-;;                ret
-;;
-;;SM8:            mov     byte [si],2
-;;                jmp     SR12
-;;
-;;SM1:            bne     byte [si+16],0,SR0      ; КАМЕНЬ: Можем упасть?
-;;                mov     byte [si],16            ; КАМЕНЬ: Падаем вниз...
-;;                mov     byte [si+16],15
-;;                jmp     SR124
-;;
-;;SR0:            inc     si                      ; КАМЕНЬ: Скатиться вправо?
-;;                be      bh,16,SR1
-;;                mov     al,[si]
-;;                or      al,[si+16]
-;;                jnz     SR1
-;;                mov     byte [si],1             ; КАМЕНЬ: Катимся вправо...
-;;                dec     si
-;;                mov     byte [si],0
-;;                jmp     SR124
-;;
-;;SR1:            dec     si                      ; КАМЕНЬ: Скатиться влево?
-;;                dec     si
-;;                be      bh,1,SR14
-;;                mov     al,[si]
-;;                or      al,[si+16]
-;;                jnz     SR14
-;;                mov     byte [si],1             ; КАМЕНЬ: Катимся влево...
-;;                inc     si
-;;                mov     byte [si],0
-;;                dec     si
-;;                dec     bh
-;;                jmp     SR124
-;;                
-;;SM2:            bne     byte [si+16],0,SR2      ; АЛМАЗ: Может упасть?
-;;                mov     byte [si],11            ; АЛМАЗ: Падает вниз...
-;;                mov     byte [si+16],10
-;;                jmp     SR124
-;;
-;;SR2:            inc     si                      ; АЛМАЗ: Скатиться вправо?
-;;                be      bh,16,SR3
-;;                mov     al,[si]
-;;                or      al,[si+16]
-;;                jnz     SR3
-;;                mov     byte [si],2             ; АЛМАЗ: Катимся вправо...
-;;                dec     si
-;;                mov     byte [si],0
-;;                jmp     SR124
-;;
-;;SR3:            dec     si                      ; АЛМАЗ: Скатиться влево?
-;;                dec     si
-;;                be      bh,1,SR14
-;;                mov     al,[si]
-;;                or      al,[si+16]
-;;                jnz     SR14
-;;                mov     byte [si],2             ; АЛМАЗ: Катимся влево...
-;;                inc     si
-;;                mov     byte [si],0
-;;                dec     si
-;;                dec     bh
-;;                jmp     SR124
-;;
-;;SR124:          mov     [PSK],1                 ; Хоть что-то двинулось...
-;;                jmp     SR12
-;;
-;;SM11:           mov     byte [si],0             ; АЛМАЗ: Падение закончилось
-;;                mov     byte [si+16],2
-;;                call    BSL                     ; Проверка - кого прибили...
-;;                jmp     SR124
-;;
-;;SM16:           mov     byte [si],0
-;;                mov     byte [si+16],1
-;;                call    BSL
-;;                jmp     SR124
-;;
-;;SM19:           mov     byte [si],0
-;;                mov     byte [si+16],17
-;;                jmp     SR12
-;;
-;;SM20:           mov     byte [si],17
-;;                mov     byte [si+16],0
-;;                jmp     SR12
-;;
-;;SM21:           mov     byte [si],20            ; меняем 21 на 20, так как
-;;                jmp     SR12                    ; проход по уровню идет снизу
-;;                                                ; вверх, и если сразу поставить
-;;                                                ; 20 то человечек будет бежать
-;;                                                ; вверх со скоростью света.
-;;
-;;SM23:           mov     byte [si],24
-;;                dec     si
-;;                mov     byte [si],0
-;;                inc     si
-;;                jmp     SR12
-;;
-;;SM26:           mov     byte [si],0
-;;                dec     si
-;;                mov     byte [si],27
-;;                dec     bh
-;;                jmp     SR12
-;;
-;;SM29:           mov     byte [si],28
-;;                dec     si
-;;                mov     byte [si],0
-;;                inc     si
-;;                jmp     SR12
-;;
-;;SM30:           mov     byte [si],0
-;;                dec     si
-;;                mov     byte [si],28
-;;                dec     bh
-;;                jmp     SR12
-;;
-;;SM33:           mov     byte [si],0
-;;                mov     byte [si+16],28
-;;                jmp     SR12
-;;
-;;SM34:           mov     byte [si],28
-;;                mov     byte [si+16],0
-;;                jmp     SR12
-;;
-;;SM40:           mov     byte [si],34
-;;                jmp     SR12
-;;
-;;SM36:           mov     byte [si],6
-;;                dec     si
-;;                mov     byte [si],0
-;;                inc     si
-;;                jmp     SR12
-;;
-;;SM37:           mov     byte [si],0
-;;                dec     si
-;;                mov     byte [si],6
-;;                dec     bh
-;;                jmp     SR12
-;;
-;;SM38:           mov     byte [si],0
-;;                mov     byte [si+16],6
-;;                jmp     SR12
-;;
-;;SM39:           mov     byte [si],6
-;;                mov     byte [si+16],0
-;;                jmp     SR12
-;;
-;;SM41:           mov     byte [si],39
-;;                jmp     SR12
-;;
-;;UPR:            mov     [HeroCoord],si          ; Координаты человека
-;;                push    si
-;;                mov     ax,[KOD]
-;;                be      ah,VK_LEFT,U1L
-;;                be      ah,VK_RIGHT,U1R
-;;                be      ah,VK_UP,U1U
-;;                be      ah,VK_DOWN,U1D
-;;                be      ah,VK_DEL,SELFDES       ; Self-destruct
-;;                pop     si
-;;                mov     byte [si],5
-;;                jmp     SR12
-;;
-;;SELFDES:        push    bx
-;;                sub     si,17                   ; Самоуничтожение
-;;                dec     bl
-;;                dec     bh
-;;                call    UBR1
-;;                pop     bx
-;;                pop     si
-;;                jmp     SR12
-;;
-;;U1L:            mov     [KOD],VK_LEFT SHL 8     ; ЧЕЛОВЕЧЕК: Влево
-;;                mov     dx,-1
-;;                call    DWR
-;;                mov     byte [si],26
-;;                dec     si
-;;                mov     byte [si],25
-;;                pop     si
-;;                dec     si
-;;                dec     bh
-;;                jmp     SR12
-;;
-;;U1R:            mov     [KOD],VK_RIGHT SHL 8    ; ЧЕЛОВЕЧЕК: Вправо
-;;                mov     dx,1
-;;                call    DWR
-;;                mov     byte [si],22
-;;                inc     si
-;;                mov     byte [si],23
-;;                pop     si
-;;                jmp     SR12
-;;
-;;U1U:            mov     [KOD],VK_UP SHL 8       ; ЧЕЛОВЕЧЕК: Вверх
-;;                mov     dx,-16
-;;                call    DWR
-;;                int3
-;;                mov     byte [si-16],21
-;;                mov     byte [si],18
-;;                pop     si
-;;                jmp     SR12
-;;
-;;U1D:            mov     [KOD],VK_DOWN SHL 8     ; ЧЕЛОВЕЧЕК: Вниз
-;;                mov     dx,16
-;;                call    DWR
-;;                mov     byte [si],19
-;;                mov     byte [si+16],18
-;;                pop     si
-;;                jmp     SR12
-;;
-;;DWR:            push    si
-;;                push    bx
-;;                call    PROW
-;;                add     si,dx
-;;                mov     al,[si]
-;;                be      al,2,ZWK
-;;                be      al,1,SDW
-;;                be      al,3,UED
-;;                be      al,0,UED
-;;                pop     bx
-;;                pop     si
-;;                pop     ax              ; Адрес возврата
-;;                pop     si
-;;                jmp     SR12
-;;
-;;ZWK:            inc     [SoundsCount];call    SOO
-;;                dec     [AlmazesCount]
-;;                add     [OBK],SCORE_TREASURE
-;;UED:            pop     bx
-;;                pop     si
-;;                ret
-;;
-;;SDW:            call    PROW            ; СДВИГ КАМНЕЙ!!!
-;;                add     si,dx
-;;                mov     al,[si]
-;;                be      al,1,SDW
-;;                be      al,0,UEDO
-;;                pop     bx
-;;                pop     si
-;;                pop     ax              ; Адрес возврата
-;;                pop     si
-;;                jmp     SR12
-;;
-;;                ; Проверка на пределы уровня
-;;PROW:           mov     ax,[KOD]
-;;                be      ah,VK_LEFT,R1L
-;;                be      ah,VK_RIGHT,R1R
-;;                be      ah,VK_UP,R1U
-;;                be      ah,VK_DOWN,R1D
-;;                ret
-;;R1L:            dec     bh
-;;                jz      EP2
-;;                ret
-;;R1R:            inc     bh
-;;                be      bh,17,EP2
-;;                ret
-;;R1U:            dec     bl
-;;                jz      EP2
-;;                ret
-;;R1D:            inc     bl
-;;                be      bl,13,EP2
-;;                ret
-;;EP2:            pop     ax              ; Адрес возврата
-;;                pop     bx
-;;                pop     si
-;;                pop     ax              ; Адрес возврата
-;;                pop     si
-;;                jmp     SR12
-;;
-;;UEDO:           mov     byte [si],1
-;;                pop     bx
-;;                pop     si
-;;                ret
-;;
-;;                ; Проверка: грохнул ли кого камень?
-;;BSL:            mov     al,[si+32]
-;;                be      al,5,UB2
-;;                be      al,17,UB2
-;;                be      al,24,UB2
-;;                be      al,27,UB2
-;;                be      al,6,UB2
-;;                be      al,28,UB2
-;;                bne     al,0,.L1
-;;                ret
-;; .L1:           cmp     al,5
-;;                jc      ZW
-;;                ret
-;;ZW:             inc     [SoundsCount];call    SOO
-;;                ret
-;;
-;;UB2:            push    bx
-;;                push    si
-;;                add     si,15
-;;                dec     bh
-;;                inc     bl
-;;                call    UBR1
-;;                pop     si
-;;                pop     bx
-;;                ret
-;;
-;;                ; ВЗРЫВ!!!
-;;UBR1:           inc     [SoundsCount];call    SOO
-;;TRM:            call    PKR
-;;                inc     si
-;;                inc     bh
-;;                call    PKR
-;;                inc     si
-;;                inc     bh
-;;                call    PKR
-;;                add     si,16
-;;                inc     bl
-;;                call    PKR
-;;                dec     si
-;;                dec     bh
-;;                call    PKR
-;;                dec     si
-;;                dec     bh
-;;                call    PKR
-;;                add     si,16
-;;                inc     bl
-;;                call    PKR
-;;                inc     si
-;;                inc     bh
-;;                call    PKR
-;;                inc     si
-;;                inc     bh
-;;                call    PKR
-;;                inc     [SoundsCount];call    SOO
-;;                ret
-;;
-;;PKR:            be      bh,17,.Ex
-;;                be      bh,0,.Ex
-;;                be      bl,13,.Ex
-;;                be      bl,0,.Ex
-;;                mov     al,[si]
-;;                be      al,7,.Ex                ; бетон непробиваем
-;;                cmp     al,29
-;;                jnc     .Ex
-;;                be      al,28,ZP
-;;                be      al,2,.Ex                ; уже алмаз
-;;                be      al,5,PP                 ; человечек - взрывается
-;;                cmp     al,17
-;;                jnc     PP
-;;                cmp     al,7
-;;                jnc     .Ex
-;;                jmp     ZP
-;; .Ex:           ret
-;;ZP:             mov     byte [si],2
-;;                inc     [AlmazesCount]
-;;                ret
-;;PP:             mov     [PlayerDie],TRUE        ; ЧЕЛОВЕЧЕК Прихлопнут :(
-;;                jmp     ZP
-;;
-;;SM6:            push    bx
-;;                push    si
-;;                cmp     si,[HeroCoord]
-;;                jc      MM0_
-;;SE1:            dec     si
-;;                dec     bh
-;;                be      bh,0,SE2
-;;                mov     al,[si]
-;;                cmp     al,28
-;;                jnc     SE2
-;;                be      al,5,UBR2
-;;                cmp     al,17
-;;                jnc     UBR2
-;;                bne     al,0,SE2
-;;                mov     byte [si],31
-;;                inc     si
-;;                mov     byte [si],37
-;;                pop     si
-;;                dec     si
-;;                pop     bx
-;;                dec     bh
-;;                jmp     SR12
-;;SE2:            sub     si,15
-;;                inc     bh
-;;                dec     bl
-;;                be      bl,0,E5_
-;;                mov     al,[si]
-;;                cmp     al,28
-;;                jnc     E5_
-;;                be      al,5,UBR2
-;;                cmp     al,17
-;;                jnc     UBR2
-;;                bne     al,0,E5_
-;;                mov     byte [si],41
-;;                pop     si
-;;                mov     byte [si],32
-;;                pop     bx
-;;                jmp     SR12
-;;E5_:            pop     si
-;;                pop     bx
-;;                mov     byte [si],28
-;;                jmp     SR12
-;;MM0_:           inc     si
-;;                inc     bh
-;;                be      bh,17,SQ0
-;;                mov     al,[si]
-;;                cmp     al,28
-;;                jnc     SQ0
-;;                be      al,5,UBR2
-;;                cmp     al,17
-;;                jnc     UBR2
-;;                bne     al,0,SQ0
-;;                mov     byte [si],36
-;;                pop     si
-;;                mov     byte [si],31
-;;                pop     bx
-;;                jmp     SR12
-;;SQ0:            add     si,15
-;;                dec     bh
-;;                inc     bl
-;;                be      bl,13,E6_
-;;                mov     al,[si]
-;;                cmp     al,28
-;;                jnc     E6_
-;;                be      al,5,UBR2
-;;                cmp     al,17
-;;                jnc     UBR2
-;;                bne     al,0,E6_
-;;                mov     byte [si],32
-;;                pop     si
-;;                mov     byte [si],38
-;;                pop     bx
-;;                jmp     SR12
-;;E6_:            pop     si
-;;                pop     bx
-;;                mov     byte [si],28
-;;                jmp     SR12
-;;
-;;SM28:           push    bx
-;;                push    si
-;;                cmp     si,[HeroCoord]
-;;                jnc     MM1_
-;;SE3:            dec     si
-;;                dec     bh
-;;                be      bh,0,SE4
-;;                mov     al,[si]
-;;                cmp     al,28
-;;                jnc     SE4
-;;                be      al,5,UBR2
-;;                cmp     al,17
-;;                jnc     UBR2
-;;                bne     al,0,SE4
-;;                mov     byte [si],31
-;;                pop     si
-;;                mov     byte [si],30
-;;                dec     si
-;;                pop     bx
-;;                dec     bh
-;;                jmp     SR12
-;;SE4:            sub     si,15
-;;                inc     bh
-;;                dec     bl
-;;                be      bl,0,E7_
-;;                mov     al,[si]
-;;                cmp     al,28
-;;                jnc     E7_
-;;                be      al,5,UBR2
-;;                cmp     al,17
-;;                jnc     UBR2
-;;                bne     al,0,E7_
-;;                mov     byte [si],40
-;;                pop     si
-;;                mov     byte [si],32
-;;                pop     bx
-;;                jmp     SR12
-;;E7_:            pop     si
-;;                pop     bx
-;;                mov     byte [si],6
-;;                jmp     SR12
-;;MM1_:           inc     si
-;;                inc     bh
-;;                be      bh,17,SQ1
-;;                mov     al,[si]
-;;                cmp     al,28
-;;                jnc     SQ1
-;;                be      al,5,UBR2
-;;                cmp     al,17
-;;                jnc     UBR2
-;;                bne     al,0,SQ1
-;;                mov     byte [si],29
-;;                pop     si
-;;                mov     byte [si],31
-;;                pop     bx
-;;                jmp     SR12
-;;SQ1:            add     si,15
-;;                dec     bh
-;;                inc     bl
-;;                be      bl,13,E8_
-;;                mov     al,[si]
-;;                cmp     al,28
-;;                jnc     E8_
-;;                be      al,5,UBR2
-;;                cmp     al,17
-;;                jnc     UBR2
-;;                bne     al,0,E8_
-;;                mov     byte [si],32
-;;                pop     si
-;;                mov     byte [si],33
-;;                pop     bx
-;;                jmp     SR12
-;;E8_:            pop     si
-;;                pop     bx
-;;                mov     byte [si],6
-;;                jmp     SR12
-;;
-;;UBR2:           sub     si,17
-;;                dec     bh
-;;                dec     bl
-;;                call    TRM
-;;                pop     si
-;;                pop     bx
-;;                jmp     SR12
-;;;------------------------------------------------------------------------------
-;;
-;;                ; Подсчет количества драгоценностей
+                ; ОБРАБОТКА ЛАБИРИНТА!!!
+proc            SKA
+                mov     [PSK],0                 ; Флаг движения
+                mov     [HeroDie],FALSE
+                mov     [SoundsCount],0         ; Кол-во звуковых эффектов
+                mov     esi,Maze+191            ; +191 перемещаемся в правую самую нижнюю ячейку
+                mov     bh,MAZE_WIDTH
+ .LoopY:        mov     bl,MAZE_HEIGHT
+ .LoopX:        movzx   eax, byte [esi]
+                cmp     al,41
+                ja      .NextCell
+                jmp     dword [.SwitchTable + eax*4]
+ .SwitchTable:  ; ОСНОВНЫЕ КОДЫ
+                dd      .NextCell       ; 00 =Пустота                        - НЕТ ОБРАБОТКИ
+                dd      .SM1            ; 01 =Камень - падает, скатывается
+                dd      .SM2            ; 02 =Алмаз - падает, скатывается
+                dd      .NextCell       ; 03 =Земля                          - НЕТ ОБРАБОТКИ
+                dd      .NextCell       ; 04 =Стены кирпичные, пробиваемые   - НЕТ ОБРАБОТКИ
+                dd      .UPR            ; 05 =Человечек - передвигается
+                dd      .SM6            ; 06 ="Чудище"
+                dd      .NextCell       ; 07 =Стены бетонные, непробиваемые  - НЕТ ОБРАБОТКИ
+                ; ОБРАБОТКА ПРОМЕЖУТОЧНЫХ ЭЛЕМЕНТОВ
+                dd      .SM8            ; 08 - ??? - спрайт - алмаз, но нигде не используется
+                dd      .NextCell       ; 09 - ??? - спрайт - пустота, но нигде не используется
+                dd      .NextCell       ; 10 - нижняя часть алмаза, падающего вниз
+                dd      .SM11           ; 11 - верхняя часть алмаза, падающего вниз
+                dd      .NextCell       ; 12 - ???
+                dd      .NextCell       ; 13 - ???
+                dd      .NextCell       ; 14 - ???
+                dd      .NextCell       ; 15 - нижняя часть камня, падающего вниз
+                dd      .SM16           ; 16 - верхняя часть камня, падающего вниз
+                dd      .UPR            ; 17 - человечек бежит ВВЕРХ, закончил движение
+                dd      .NextCell       ; 18 - человечек бежит ВВЕРХ, откуда / бежит ВНИЗ, куда
+                dd      .SM19           ; 19 - человечек бежит ВНИЗ, откуда
+                dd      .SM20           ; 20 - человечек бежит ВВЕРХ, куда      ;(код 21 меняется на 20, из-за обработки
+                dd      .SM21           ; 21 - человечек бежит ВВЕРХ, куда      ; лабиринта снизу вверх)
+                dd      .NextCell       ; 22 - человечек бежит ВПРАВО, откуда
+                dd      .SM23           ; 23 - человечек бежит ВПРАВО, куда
+                dd      .UPR            ; 24 - человечек бежит ВПРАВО, закончил движение
+                dd      .NextCell       ; 25 - человечек бежит ВЛЕВО, куда
+                dd      .SM26           ; 26 - человечек бежит ВЛЕВО, откуда
+                dd      .UPR            ; 27 - человечек бежит ВЛЕВО, закончил движение
+                dd      .SM28           ; 28
+                dd      .SM29           ; 29
+                dd      .SM30           ; 30
+                dd      .NextCell       ; 31
+                dd      .NextCell       ; 32
+                dd      .SM33           ; 33
+                dd      .SM34           ; 34
+                dd      .NextCell       ; 35
+                dd      .SM36           ; 36
+                dd      .SM37           ; 37
+                dd      .SM38           ; 38
+                dd      .SM39           ; 39
+                dd      .SM40           ; 40
+                dd      .SM41           ; 41
+ .MovedAndNextCell:
+                mov     [PSK],1                 ; Хоть что-то двинулось...
+ .NextCell:     dec     esi
+                dec     bh
+                jnz     .LoopX
+                dec     bl
+                jnz     .LoopY
+                call    MakeSoundEffects
+                call    DrawLevel
+                ret
+
+ .SM8:          mov     byte [esi],2            ; ?????????????
+                jmp     .NextCell
+
+                ;=== КАМЕНЬ ===
+
+                ; Камень падает вниз
+ .SM1:          bne     byte [esi+16], 0, .SR0  ; КАМЕНЬ: Можем упасть?
+                mov     byte [esi],16           ; КАМЕНЬ: Падаем вниз...
+                mov     byte [esi+16],15
+                jmp     .MovedAndNextCell
+
+                ; Камень скатывается вправо
+ .SR0:          be      bh, 16, .SR1            ; КАМЕНЬ: Есть куда скатиться вправо?         
+                mov     al,[esi +1]             ; Если крайняя правая ячейка, ничего не делаем
+                or      al,[esi+16 +1]
+                jnz     .SR1
+                mov     byte [esi +1],1         ; КАМЕНЬ: Катимся вправо...
+                mov     byte [esi],0
+                jmp     .MovedAndNextCell
+
+                ; Камень скатывается влево
+ .SR1:          be      bh, 1, .NextCell        ; КАМЕНЬ: Есть куда скатиться влево?
+                mov     al,[esi -1]
+                or      al,[esi+16 -1]
+                jnz     .NextCell
+                mov     byte [esi -1],1         ; КАМЕНЬ: Катимся влево...
+                mov     byte [esi],0
+                dec     esi                     ; Сдвигаемся влево, пропуская камень, иначе камень
+                dec     bh                      ; очень быстро будет "скатываться" вправо.
+                jmp     .MovedAndNextCell
+                
+                ; Камень - завершает падение вниз
+ .SM16:         mov     byte [esi],0
+                mov     byte [esi+16],1
+                call    .BSL
+                jmp     .MovedAndNextCell
+
+                ;=== АЛМАЗ ===
+
+                ; Алмаз падает вниз
+ .SM2:          bne     byte [esi+16], 0, .SR2  ; АЛМАЗ: Может упасть?
+                mov     byte [esi],11           ; АЛМАЗ: Падает вниз...
+                mov     byte [esi+16],10
+                jmp     .MovedAndNextCell
+
+                ; Алмаз скатывается вправо
+ .SR2:          be      bh,16,.SR3              ; АЛМАЗ: Скатиться вправо?
+                mov     al,[esi +1]
+                or      al,[esi+16 +1]
+                jnz     .SR3
+                mov     byte [esi +1],2         ; АЛМАЗ: Катимся вправо...
+                mov     byte [esi],0
+                jmp     .MovedAndNextCell
+
+                ; Алмаз скатывается влево
+ .SR3:          be      bh, 1, .NextCell        ; АЛМАЗ: Скатиться влево?
+                mov     al,[esi -1]
+                or      al,[esi+16 -1]
+                jnz     .MovedAndNextCell
+                mov     byte [esi -1],2         ; АЛМАЗ: Катимся влево...
+                mov     byte [esi],0
+                dec     esi                     ; Пропускаем левую ячейку, иначе алмаз будем очень
+                dec     bh                      ; быстро двигаться влево
+                jmp     .MovedAndNextCell
+
+                ; Алмаз - завершает падение вниз
+ .SM11:         mov     byte [esi],0            ; АЛМАЗ: Падение закончилось
+                mov     byte [esi+16],2
+                call    .BSL                    ; Проверка - кого прибили...
+                jmp     .MovedAndNextCell
+
+                ;=== ЧЕЛОВЕЧЕК ===
+
+                ; Временный код 21 меняется на 20
+ .SM21:         mov     byte [esi],20           ; меняем 21 на 20, так как
+                jmp     .NextCell               ; обработка уровня идёт снизу
+                                                ; вверх, и если сразу поставить
+                                                ; 20 то человечек будет бежать
+                                                ; вверх со скоростью света.
+
+                ; Человечек завершает движения вниз
+ .SM19:         mov     byte [esi],0
+                mov     byte [esi+16],17
+                jmp     .NextCell
+
+                ; Человечек завершает движение вверх
+ .SM20:         mov     byte [esi],17
+                mov     byte [esi+16],0
+                jmp     .NextCell
+
+                ; Человечек завершает перемещение вправо
+ .SM23:         mov     byte [esi],24
+                mov     byte [esi -1],0
+                jmp     .NextCell
+
+                ; Человечек завершает движение влево
+ .SM26:         mov     byte [esi],0
+                mov     byte [esi -1],27
+                dec     si                      ; Пропускаем левую ячейку
+                dec     bh
+                jmp     .NextCell
+
+                ; Начало движения человечка, в зависимости от нажатой клавиши
+ .UPR:          mov     [HeroCoord],esi         ; Координаты человека
+                push    esi
+                mov     eax,[KOD]
+                switch  eax, KBD_MOVE_LEFT,  .U1L, \
+                             KBD_MOVE_RIGHT, .U1R, \
+                             KBD_MOVE_UP,    .U1U, \
+                             KBD_MOVE_DOWN,  .U1D, \
+                             KBD_DESTRUCT,   .SelfDestruct
+                pop     esi
+                mov     byte [esi],5            ; Код человечка
+                jmp     .NextCell
+
+                ; Человечек начинает движение влево
+ .U1L:          mov     edx,-1
+                call    .DWR
+                mov     byte [esi],26
+                mov     byte [esi -1],25
+                pop     esi
+                dec     esi                     ; Пропускаем ячейки слева, иначе человечек будет бежать быстро
+                dec     bh
+                jmp     .NextCell
+
+                ; Человечек начинает движение вправо
+ .U1R:          mov     edx,1
+                call    .DWR
+                mov     byte [esi],22
+                mov     byte [esi +1],23
+                pop     esi
+                jmp     .NextCell
+
+                ; Человечек начинает движение вверх
+ .U1U:          mov     edx,-16
+                call    .DWR
+                mov     byte [esi-16],21
+                mov     byte [esi],18
+                pop     esi
+                jmp     .NextCell
+
+                ; Человечек начинает движение вниз
+ .U1D:          mov     edx,16
+                call    .DWR
+                mov     byte [esi],19
+                mov     byte [esi+16],18
+                pop     esi
+                jmp     .NextCell
+
+                ; Человечек самоуничтожается
+ .SelfDestruct: push    ebx
+                sub     esi,17
+                dec     bl
+                dec     bh
+                call    .UBR1                   ; Расставляем алмазы на области 3*3
+                pop     ebx
+                pop     esi
+                jmp     .NextCell
+
+                ;
+
+ .SM29:         mov     byte [esi],28
+                mov     byte [esi -1],0
+                jmp     .NextCell
+
+ .SM30:         mov     byte [esi],0
+                mov     byte [esi -1],28
+                dec     esi
+                dec     bh
+                jmp     .NextCell
+
+ .SM33:         mov     byte [esi],0
+                mov     byte [esi+16],28
+                jmp     .NextCell
+
+ .SM34:         mov     byte [esi],28
+                mov     byte [esi+16],0
+                jmp     .NextCell
+
+ .SM40:         mov     byte [esi],34
+                jmp     .NextCell
+
+ .SM36:         mov     byte [esi],6
+                mov     byte [esi -1],0
+                jmp     .NextCell
+
+ .SM37:         mov     byte [esi],0
+                mov     byte [esi -1],6
+                dec     esi
+                dec     bh
+                jmp     .NextCell
+
+ .SM38:         mov     byte [esi],0
+                mov     byte [esi+16],6
+                jmp     .NextCell
+
+ .SM39:         mov     byte [esi],6
+                mov     byte [esi+16],0
+                jmp     .NextCell
+
+ .SM41:         mov     byte [esi],39
+                jmp     .NextCell
+
+
+
+                ; DWR - проверка на движение камней человечком
+ .DWR:          push    esi
+                push    ebx
+                call    .PROW
+                add     esi,edx
+                mov     al,[esi]
+                be      al,2,.ZWK
+                be      al,1,.SDW
+                be      al,3,.UED
+                be      al,0,.UED
+                pop     ebx
+                pop     esi
+                pop     eax                      ; Адрес возврата
+                pop     esi
+                jmp     .NextCell
+
+ .ZWK:          inc     [SoundsCount];call    SOO
+                dec     [AlmazesCount]
+                add     [OBK],SCORE_TREASURE
+ .UED:          pop     ebx
+                pop     esi
+                ret
+
+ .SDW:          call    .PROW           ; СДВИГ КАМНЕЙ!!!
+                add     esi,edx
+                mov     al,[esi]
+                be      al,1,.SDW
+                be      al,0,.UEDO
+                pop     ebx
+                pop     esi
+                pop     eax             ; Адрес возврата
+                pop     esi
+                jmp     .NextCell
+
+                ; Проверка на пределы уровня
+ .PROW:         mov     eax,[KOD]
+                switch  eax, KBD_MOVE_LEFT,  .R1L, \
+                             KBD_MOVE_RIGHT, .R1R, \
+                             KBD_MOVE_UP,    .R1U, \
+                             KBD_MOVE_DOWN,  .R1D
+                ret
+ .R1L:          dec     bh
+                jz      .EP2
+                ret
+ .R1R:          inc     bh
+                be      bh,17,.EP2
+                ret
+ .R1U:          dec     bl
+                jz      .EP2
+                ret
+ .R1D:          inc     bl
+                be      bl,13,.EP2
+                ret
+ .EP2:          pop     eax             ; Адрес возврата
+                pop     ebx
+                pop     esi
+                pop     eax             ; Адрес возврата
+                pop     esi
+                jmp     .NextCell
+
+ .UEDO:         mov     byte [esi],1
+                pop     ebx
+                pop     esi
+                ret
+
+                ; Проверка: грохнул ли кого камень?
+ .BSL:          mov     al,[esi+16+16]                   ; Смотрим на 2 строчки ниже
+                be      al,5,.UB2
+                be      al,17,.UB2
+                be      al,24,.UB2
+                be      al,27,.UB2
+                be      al,6,.UB2
+                be      al,28,.UB2
+                bne     al,0,.L1
+                ret
+ .L1:           cmp     al,5
+                jc      .ZW
+                ret
+ .ZW:           inc     [SoundsCount];call    SOO
+                ret
+
+ .UB2:          push    ebx
+                push    esi
+                add     esi,15
+                dec     bh
+                inc     bl
+                call    .UBR1
+                pop     esi
+                pop     ebx
+                ret
+
+                ; ВЗРЫВ!!!
+ .UBR1:         inc     [SoundsCount];call    SOO
+ .TRM:          call    .PKR
+                inc     esi
+                inc     bh
+                call    .PKR
+                inc     esi
+                inc     bh
+                call    .PKR
+                add     esi,16
+                inc     bl
+                call    .PKR
+                dec     esi
+                dec     bh
+                call    .PKR
+                dec     esi
+                dec     bh
+                call    .PKR
+                add     esi,16
+                inc     bl
+                call    .PKR
+                inc     esi
+                inc     bh
+                call    .PKR
+                inc     esi
+                inc     bh
+                call    .PKR
+                inc     [SoundsCount];call    SOO
+                ret
+
+ .PKR:          be      bh,17,.Ex
+                be      bh,0,.Ex
+                be      bl,13,.Ex
+                be      bl,0,.Ex
+                mov     al,[esi]
+                be      al,7,.Ex                ; бетон непробиваем
+                cmp     al,29
+                jnc     .Ex
+                be      al,28,.ZP
+                be      al,2,.Ex                ; уже алмаз
+                be      al,5,.PP                ; человечек - взрывается
+                cmp     al,17
+                jnc     .PP
+                cmp     al,7
+                jnc     .Ex
+                jmp     .ZP
+ .Ex:           ret
+ .ZP:           mov     byte [esi],2
+                inc     [AlmazesCount]
+                ret
+ .PP:           mov     [HeroDie],TRUE          ; ЧЕЛОВЕЧЕК Прихлопнут :(
+                jmp     .ZP
+
+
+                ;=== ЧУДИЩЕ ===
+
+                ;
+ .SM6:          push    ebx
+                push    esi
+                cmp     esi,[HeroCoord]
+                jc      .MM0_
+ .SE1:          dec     esi
+                dec     bh
+                be      bh,0,.SE2
+                mov     al,[esi]
+                cmp     al,28
+                jnc     .SE2
+                be      al,5,.UBR2
+                cmp     al,17
+                jnc     .UBR2
+                bne     al,0,.SE2
+                mov     byte [esi],31
+                inc     esi
+                mov     byte [esi],37
+                pop     esi
+                dec     esi
+                pop     ebx
+                dec     bh
+                jmp     .NextCell
+ .SE2:          sub     esi,15
+                inc     bh
+                dec     bl
+                be      bl,0,.E5_
+                mov     al,[esi]
+                cmp     al,28
+                jnc     .E5_
+                be      al,5,.UBR2
+                cmp     al,17
+                jnc     .UBR2
+                bne     al,0,.E5_
+                mov     byte [esi],41
+                pop     esi
+                mov     byte [esi],32
+                pop     ebx
+                jmp     .NextCell
+ .E5_:          pop     esi
+                pop     ebx
+                mov     byte [esi],28
+                jmp     .NextCell
+ .MM0_:         inc     esi
+                inc     bh
+                be      bh,17,.SQ0
+                mov     al,[esi]
+                cmp     al,28
+                jnc     .SQ0
+                be      al,5,.UBR2
+                cmp     al,17
+                jnc     .UBR2
+                bne     al,0,.SQ0
+                mov     byte [esi],36
+                pop     esi
+                mov     byte [esi],31
+                pop     ebx
+                jmp     .NextCell
+ .SQ0:          add     esi,15
+                dec     bh
+                inc     bl
+                be      bl,13,.E6_
+                mov     al,[esi]
+                cmp     al,28
+                jnc     .E6_
+                be      al,5,.UBR2
+                cmp     al,17
+                jnc     .UBR2
+                bne     al,0,.E6_
+                mov     byte [esi],32
+                pop     esi
+                mov     byte [esi],38
+                pop     ebx
+                jmp     .NextCell
+ .E6_:          pop     esi
+                pop     ebx
+                mov     byte [esi],28
+                jmp     .NextCell
+
+ .SM28:         push    ebx
+                push    esi
+                cmp     esi,[HeroCoord]
+                jnc     .MM1_
+ .SE3:          dec     esi
+                dec     bh
+                be      bh,0,.SE4
+                mov     al,[esi]
+                cmp     al,28
+                jnc     .SE4
+                be      al,5,.UBR2
+                cmp     al,17
+                jnc     .UBR2
+                bne     al,0,.SE4
+                mov     byte [esi],31
+                pop     esi
+                mov     byte [esi],30
+                dec     esi
+                pop     ebx
+                dec     bh
+                jmp     .NextCell
+ .SE4:          sub     esi,15
+                inc     bh
+                dec     bl
+                be      bl,0,.E7_
+                mov     al,[esi]
+                cmp     al,28
+                jnc     .E7_
+                be      al,5,.UBR2
+                cmp     al,17
+                jnc     .UBR2
+                bne     al,0,.E7_
+                mov     byte [esi],40
+                pop     esi
+                mov     byte [esi],32
+                pop     ebx
+                jmp     .NextCell
+ .E7_:          pop     esi
+                pop     ebx
+                mov     byte [esi],6
+                jmp     .NextCell
+ .MM1_:         inc     esi
+                inc     bh
+                be      bh,17,.SQ1
+                mov     al,[esi]
+                cmp     al,28
+                jnc     .SQ1
+                be      al,5,.UBR2
+                cmp     al,17
+                jnc     .UBR2
+                bne     al,0,.SQ1
+                mov     byte [esi],29
+                pop     esi
+                mov     byte [esi],31
+                pop     ebx
+                jmp     .NextCell
+ .SQ1:          add     esi,15
+                dec     bh
+                inc     bl
+                be      bl,13,.E8_
+                mov     al,[esi]
+                cmp     al,28
+                jnc     .E8_
+                be      al,5,.UBR2
+                cmp     al,17
+                jnc     .UBR2
+                bne     al,0,.E8_
+                mov     byte [esi],32
+                pop     esi
+                mov     byte [esi],33
+                pop     ebx
+                jmp     .NextCell
+ .E8_:          pop     esi
+                pop     ebx
+                mov     byte [esi],6
+                jmp     .NextCell
+
+ .UBR2:         sub     esi,17
+                dec     bh
+                dec     bl
+                call    .TRM
+                pop     esi
+                pop     ebx
+                jmp     .NextCell
+endp ; SKA
+
+                ; Подсчет количества драгоценностей
 proc            CalculateLevel
                 mov     esi,Maze
                 mov     edx,0
@@ -1911,7 +1939,7 @@ proc            DEMO
                 call    PlayLoop                ; >ИГРОВОЙ ЦИКЛ<
                 switch  eax, GAME_LEVEL_DONE,  .HideLevel, \
                              GAME_PLAY_BREAK,  .DemoEnd,   \
-                             GAME_PLAYER_DIE,  .DemoEnd,   \
+                             GAME_HERO_DIE,    .DemoEnd,   \
                              GAME_LEVEL_BREAK, .DemoEnd
  .HideLevel:    mov     esi,Maze
                 mov     edi,BLACK_SCREEN
@@ -1930,9 +1958,9 @@ endp
 proc            DEMO_FROM_BEGIN
                 xor     eax, eax
                 mov     [Level],eax               ; Начать демонстрацию с начала
-                ;mov     esi, GameTitle
-                ;mov     edi, MAZE_SCREEN
-                ;call    SlideUp
+                ;;mov     esi, GameTitle
+                ;;mov     edi, MAZE_SCREEN
+                ;;call    SlideUp
                 call    DEMO
                 ret
 endp
@@ -1941,42 +1969,54 @@ endp
 ;=== PLAY LOOP ================================================================
 proc            PlayLoop
                 call    CalculateLevel          ; Подсчет алмазов и вычисление координат героя
-                call    MazeToMazeWork
-                be      [GameMode],MODE_DEMO,.L3
-                call    InitRecRec              ; Настройка ЗАПИСИ
-                jmp     .GameLoop
- .L3:           call    InitRecPlay             ; Настройка ВОСПРОИЗВЕДЕНИЯ
-                ;;;
- .GameLoop:     ; PERFORM DELAY, AND SCAN KEYS
-                stdcall ProcessMessages, PM_EXIT_BY_TIMER, GAME_DELAY
-                ; CHECK TO GAME DONE
-                be      [AlmazesCount],0,.LevelDone
+;;;                call    MazeToMazeWork
                 ;
-                bne     [GameMode],MODE_DEMO,.L1
-                ; PLAY GAME
-                call    GrabKeyCode
-                be      eax,VK_ESCAPE,.L2       ; Выход во время демо...
-                call    GetRecordedKeyCode      ; ИЗВЛЕЧЬ код нажатой клавиши из демо
+                ; НАСТРОЙКА ЗАПИСИ / ВОСПРОИЗВЕДЕНИЯ
+                ;
+                be      [GameMode],MODE_DEMO,.L3
+                call    RecorderInit
+                jmp     .GameLoop
+ .L3:           call    PlayerInit
+                ;
+                ; ИГРОВОЙ ЦИКЛ
+                ;
+ .GameLoop:     stdcall ProcessMessages, PM_EXIT_BY_TIMER, GAME_DELAY   ; Задержка игры, сканирование клавиатуры
+                ;
+                ; ПРОВЕРКА: СОБРАЛИ ВСЕ АЛМАЗЫ?
+                ;
+                bne     [AlmazesCount], 0, .readKey     ; Алмазов 0 ? Если НЕТ, продолжаем проверки
+                be      [GameMode],MODE_DEMO,.LevelDone ; Демо - просто выходим
+                call    RecorderStop                    ; Игра - остановить запись, выход
+                jmp     .LevelDone
+                ;
+                ; ЧИТАЕМ НАЖАТУЮ КЛАВИШУ (ИЗ ДЕМО-ЗАПИСИ ИЛИ С КЛАВИАТУРЫ)
+                ;
+ .readKey:      bne     [GameMode],MODE_DEMO,.L1
+                call    GrabKeyCode                     ; Проверяем, не нажали ли ESC (выход) ?
+                be      eax, KBD_ESCAPE, .L2            ; Выход во время демо...
+                call    PlayerGetKey                    ; Код клавиши извлекаем из ЗАПИСИ
                 jmp     .L2
- .L1:           ; DEMO GAME
-                call    GrabKeyCode
-                call    RecKeyCode              ; ЗАПИСАТЬ код нажатой клавиши в демо
+ .L1:           call    GrabKeyCode                     ; Читаем код нажатой клавиши
+                call    RecorderPutKey                  ; Код клавиши ЗАПИСЫВАЕМ
  .L2:           mov     [KOD],eax
-                ; CHECK PRESSED KEYS
-                be      eax,VK_ESC,.PlayBreak   ; Выход из игры/демо
-                call    SKA                     ; ДВИЖЕНИЕ!!!
-                bne     [PlayerDie],TRUE,.GameLoop
-                be      [KOD],VK_DELETE,.LevelBreak; Прерывание игры (если, например, завалило камнями)
-                jmp     .PlayerDie
- .LevelDone:    be      [GameMode],MODE_DEMO,.L4
-                call    RecKeyCodeStop          ; Остановить запись...
- .L4:           mov     eax,GAME_LEVEL_DONE     ; УРОВЕНЬ ПРОЙДЕН!!!
+                be      eax, KBD_ESCAPE, .PlayBreak     ; Проверяем, не вышли ли мы из игрового цикла (клавиша ESC) ?
+                ;
+                ; ОБРАБОТКА ЛАБИРИНТА
+                ;
+                call    SKA                             ; ДВИЖЕНИЕ!!!
+                bne     [HeroDie],TRUE,.GameLoop        ; Если герой жив, продолжаем игровой цикл
+                be      [KOD], KBD_DESTRUCT, .LevelBreak; Прерывание игры: смотрим, по какой причине и соответственно
+                jmp     .HeroDie                        ; от этого зависит статус завершения игрового цикла
+                ;
+                ; ВЫХОД ИЗ ИГРОВОГО ЦИКЛА С УКАЗАНИЕМ ПРИЧИНЫ
+                ;
+ .LevelDone:    mov     eax,GAME_LEVEL_DONE             ; УРОВЕНЬ ПРОЙДЕН!!!
                 ret
- .PlayBreak:    mov     eax,GAME_PLAY_BREAK     ; ВЫХОД ИЗ ИГРЫ!!!
+ .PlayBreak:    mov     eax,GAME_PLAY_BREAK             ; ВЫХОД ИЗ ИГРЫ!!!
                 ret
- .LevelBreak:   mov     eax,GAME_LEVEL_BREAK    ; ПЕРЕЗАПУСК УРОВНЯ!!!
+ .LevelBreak:   mov     eax,GAME_LEVEL_BREAK            ; ПЕРЕЗАПУСК УРОВНЯ!!!
                 ret
- .PlayerDie:    mov     eax,GAME_PLAYER_DIE     ; ЧЕЛОВЕЧКА ПРИБИЛО!!!
+ .HeroDie:      mov     eax,GAME_HERO_DIE               ; ЧЕЛОВЕЧКА ПРИБИЛО!!!
                 ret                             
 endp
 ;==============================================================================
@@ -2011,10 +2051,10 @@ proc            EditLevel
                 call    ExpandLevel
                 stdcall DrawLevel, Maze
                 mov     [PrevUnder],0
-                mov     dx, 0                   ; Координаты курсора (dh=y, dl=x)
+                xor     edx, edx                ; Координаты курсора (dh=y, dl=x)
                 ; Цикл редактора
  .EditLoop:     movzx   esi, dh                 ; адрес в Maze = dh*16+dl; dh << 4 + dl
-                shl     esi, 4
+                imul    esi, MAZE_WIDTH
                 movzx   edi, dl
                 lea     esi, [esi+edi+Maze]
                 ;
@@ -2201,15 +2241,16 @@ endp
 ;;                inc     di
 ;;                loop    GLG
 ;;                ret       
-;;
-;;                ; Произвести короткий звучек!!!
-;;SOO:            push    cx
-;;                mov     cx,5
-;; .L1:           call    BeepBolder
-;;                loop    .L1
-;;                pop     cx
-;;                ret
-;;
+
+                ; Произвести короткий звучек!!!
+proc            SOO
+                push    ecx
+                mov     ecx,5
+ .L1:           call    BeepBolder
+                loop    .L1
+                pop     ecx
+                ret
+endp
 
 ;=== Общие макросы для ЗАПИСИ / ВОСПРОИЗВЕДЕНИЯ ===============================
 macro           DECODE_RLE_KEY          ; decode AL code to AH (count) AL (event)
@@ -2227,7 +2268,6 @@ macro           ENCODE_RLE_KEY          ; encode AH (count) AL (event) to AL
 END_RLE_KEY     =       0106h           ; Код самоуничтожения
 
 ;=== ЗАПИСЬ игры ==============================================================
-
                 ; Инициализация записывателя
 proc            RecorderInit
                 mov     eax,RecArray
@@ -2237,79 +2277,57 @@ proc            RecorderInit
                 ret
 endp
 
-;;
-;;RecToKey:       push    bx
-;;                mov     bl,al
-;;                mov     bh,0
-;;                mov     ah,[bx+xlatRec]
-;;                mov     al,0
-;;                pop     bx
-;;                ret
-;;
-;;KeyToRec:       push    di cx
-;;                mov     di,xlatRec
-;;                mov     cx,xlatRec.size
-;;                mov     al,ah
-;;                repne   scasb
-;;                je      .L1
-;;                mov     di,xlatRec+1
-;; .L1:           dec     di
-;;                mov     ax,di
-;;                sub     ax,xlatRec
-;;                pop     cx di
-;;                ret
-;;                ;       0. 1.     2.       3.       4.        5.      6.
-;;xlatRec         DB      0, VK_UP, VK_DOWN, VK_LEFT, VK_RIGHT, VK_ESC, VK_DEL
-;; .size          =       $-xlatRec
-;;
-;;                ; Записать код нажатой клавиши (код в AH)
-;;RecKeyCode:     push    ax bx di
-;;                call    KeyToRec
-;;                mov     bx,[RecRecCode]
-;;                bne     bx,-1,.L1
-;; .L2:           mov     ah,1
-;;                mov     [RecRecCode],ax
-;;                jmp     .done
-;; .L1:           be      bh,11111b,.inc_new_seq  ; Счетчик переполнен?
-;;                bne     bl,al,.inc_new_seq      ; Коды одинаковые?
-;;                inc     bh                      ; ДА: увеличение счетчика
-;;                mov     [RecRecCode],bx
-;;                jmp     .done
-;; .inc_new_seq:  shl     bh,3
-;;                or      bl,bh
-;;                mov     di,[RecAddr]
-;;                mov     [di],bl
-;;                inc     di
-;;                mov     [RecAddr],di
-;;                jmp     .L2
-;; .done:         pop     di bx ax
-;;                ret
-;;
-;;RecKeyCodeStop: push    bx di cx
-;;                mov     di,[RecAddr]            ; Записать последний код
-;;                mov     ax,[RecRecCode]
-;;                shl     ah,3
-;;                or      al,ah
-;;                stosb
-;;                mov     [RecAddr],di
-;;                mov     cx,di
-;;                sub     cx,[RecBegin]           ; Длина записи
-;;                mov     si,RecArray
-;;                call    GetDemoIndex
-;;                call    ReplaceResource
-;;                call    SaveMainFiles
-;;                pop     cx di bx
-;;                ret
-;;                
+                ; Процедура записывает количество и код нажатых клавиш
+                ; IN    bh = counter (5 bit)
+                ;       bl = keycode (3 bit)
+                ; OUT   -
+proc            Recorder_Helper_Write uses edi ebx
+                mov     edi, [RecPtr]
+                shl     bh, 3
+                or      bl, bh
+                mov     [edi], bl
+                inc     edi
+                mov     [RecPtr], edi
+                inc     [RecSize]
+                ret
+endp
+
+                ; Записать код нажатой клавиши (код в AH)
+                ; IN    eax = код клавиши (0..7)
+                ; OUT   -
+proc            RecorderPutKey uses ebx
+                mov     ebx, [RecCode]                  ; BH = count, BL = keycode (default, BH=-1, BL=-1)
+                cmp     ebx, -1
+                je      .newcode
+                cmp     bh, 11111b                      ; Счётчик уже на последнем значении?
+                je      .counteroverflow
+                inc     bh
+                jmp     .L1
+ .counteroverflow:
+                call    Recorder_Helper_Write
+ .newcode:      mov     bh, 1
+                mov     bl, al
+ .L1:           mov     [RecCode], ebx
+                ret
+endp
+
+proc            RecorderStop
+                pushad
+                mov     ebx, [RecCode]
+                cmp     ebx, -1
+                jne     .L1
+                call    Recorder_Helper_Write
+ .L1:           mov     esi, RecArray
+                mov     ecx, [RecSize]
+                GET_DEMO_INDEX
+                call    ReplaceResource
+                call    SaveMainFiles
+                popad
+                ret
+endp
 
 ;=== ВОСПРОИЗВЕДЕНИЕ записанной игры ==========================================
-
-                .const
-PlayerEventToKey:      ;0  1      2        3        4         5          6          7
-                db      0, VK_UP, VK_DOWN, VK_LEFT, VK_RIGHT, VK_ESCAPE, VK_DELETE, 0
-
-                .code
-proc            PlayerRead uses esi
+proc            Player_Helper_Read uses esi
                 mov     esi, [RecSize]
                 be      esi, 0, .nodata
                 dec     esi
@@ -2330,7 +2348,7 @@ endp
 proc            PlayerInit
                 GET_DEMO_PTR
                 mov     [RecSize], eax
-                call    PlayerRead
+                call    Player_Helper_Read
                 mov     [RecCode], eax
                 ret
 endp
@@ -2340,21 +2358,18 @@ proc            PlayerGetKey
                 mov     eax, [RecCode]                  ; AH = счётчик, AL = код события
  .L1:           dec     ah
                 jns     .L2
-                call    PlayerRead
+                call    Player_Helper_Read
                 jmp     .L1
  .L2:           mov     [RecCode], eax
-
-        !!! А ЕСЛИ ВСЕ КОДЫ ИСПОЛЬЗОВАТЬ НЕ VK_..., А ОТ 0 ДО 7 ??? !!!              
-
-                movzx   eax, al                         ; Преобразовать код события в AL в код клавиши в eax
-                movzx   eax, [eax + PlayerEventToKey]
                 ret
 endp
 
+;==============================================================================
                 ; 
                 ; Копировать лабиринт
                 ;
-                ; IN    esi - код лабиринта (BLACK_SCREEN - чёрный экран, MAZE_SCREEN - лабиринт по номеру [Level],
+                ; IN    esi - код лабиринта (BLACK_SCREEN - чёрный экран, 
+                ;                            MAZE_SCREEN - лабиринт по номеру [Level],
                 ;                            иначе адрес распакованного лабиринта)
                 ;       edi - куда копировать лабиринт
                 ;
@@ -2438,25 +2453,26 @@ proc            SlideDown
                 ret
 endp
 
-                ; Добавляем непробиваемые стены со всех сторон
-                ; лабиринта, чтобы не делать всемозможных 
-                ; проверок на достижение границ лабиринта
-proc            MazeToMazeWork
-                mov     esi,Maze
-                mov     edi,MazeWork
-                mov     al,7                    ; Бетон (непробиваемый)
-                mov     ecx,16+2
-                rep     stosb
-                mov     edx,12
- .L1:           stosb
-                mov     ecx,16
-                rep     movsb
-                stosb
-                dec     edx
-                jnz     .L1
-                mov     ecx,16+2
-                rep     stosb
-                ret
-endp
+;;; MazeWork - НЕ ИСПОЛЬЗУЕТСЯ !
+;                ; Добавляем непробиваемые стены со всех сторон
+;                ; лабиринта, чтобы не делать всемозможных 
+;                ; проверок на достижение границ лабиринта
+;proc            MazeToMazeWork
+;                mov     esi,Maze
+;                mov     edi,MazeWork
+;                mov     al,7                    ; Бетон (непробиваемый)
+;                mov     ecx,16+2
+;                rep     stosb
+;                mov     edx,12
+; .L1:           stosb
+;                mov     ecx,16
+;                rep     movsb
+;                stosb
+;                dec     edx
+;                jnz     .L1
+;                mov     ecx,16+2
+;                rep     stosb
+;                ret
+;endp
 
                 END

@@ -80,6 +80,10 @@ proc            GetResourcePtr uses edi
 endp
 
                 ; put array [ESI] of length ECX into resource number EDI
+                ; IN    esi = array to write to resource
+                ;       ecx = length of array (in bytes)
+                ;       edi = index of resource (from 0)
+                ; OUT   -
 proc            ReplaceResource
                 pushad
                 mov     ebx, [resaddr]                          ; ebx = адрес области данных с ресурсами
