@@ -56,9 +56,9 @@ INIT_LIVES      =       5               ; Начальные попытки
 INIT_SCORE      =       0               ; Начальные очки
 
                 ; ЧЕМ ЗАКОНЧИЛАСЬ ИГРА
-GAME_LEVEL_DONE =       0               ; Уровень пройден
-GAME_PLAY_BREAK =       1               ; Закончили игру
-GAME_LEVEL_BREAK=       2               ; Перезапуск уровня
+GAME_LVL_DONE   =       0               ; Уровень пройден
+GAME_PLAY_END   =       1               ; Закончили игру
+GAME_LVL_RESTART=       2               ; Перезапуск уровня
 GAME_HERO_DIE   =       3               ; Герой погиб
 
                 ; РЕЖИМ РАБОТЫ
@@ -309,20 +309,22 @@ GameTitle:      DB      00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00 ; 1
                 DB      00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00 ; 11
                 DB      00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00 ; 12
 
+                .data
                 ; Экран с информацией об очках и жизнях
-GameScore:      DB      4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4                 ; 1
-                DB      4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4                 ; 2
-                DB      3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3                 ; 3
-                DB      3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3                 ; 4
-                DB      3,0,43,45,47,49,51,58,0,0,0,0,0,0,0,3           ; 5
-                DB      3,0,44,46,48,50,52,59,0,0,0,0,0,0,0,3           ; 6
-                DB      3,0,51,51,54,56,49,58,0,0,0,0,0,0,0,3           ; 7
-                DB      3,0,52,53,55,57,50,59,0,0,0,0,0,0,0,3           ; 8
-                DB      3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3                 ; 9
-                DB      3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3                 ; 10
-                DB      3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3                 ; 11
-                DB      4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4                 ; 12
+GameScore:      DB      04,04,04,04,04,04,04,04,04,04,04,04,04,04,04,04 ; 1
+                DB      04,04,04,04,04,04,04,04,04,04,04,04,04,04,04,04 ; 2
+                DB      03,03,03,03,03,03,03,03,03,03,03,03,03,03,03,03 ; 3
+                DB      03,03,03,03,03,03,03,03,03,03,03,03,03,03,03,03 ; 4
+                DB      03,00,43,45,47,49,51,58,00,00,00,00,00,00,00,03 ; 5
+                DB      03,00,44,46,48,50,52,59,00,00,00,00,00,00,00,03 ; 6
+                DB      03,00,51,51,54,56,49,58,00,00,00,00,00,00,00,03 ; 7
+                DB      03,00,52,53,55,57,50,59,00,00,00,00,00,00,00,03 ; 8
+                DB      03,00,00,00,00,00,00,00,00,00,00,00,00,00,00,03 ; 9
+                DB      03,03,03,03,03,03,03,03,03,03,03,03,03,03,03,03 ; 10
+                DB      03,03,03,03,03,03,03,03,03,03,03,03,03,03,03,03 ; 11
+                DB      04,04,04,04,04,04,04,04,04,04,04,04,04,04,04,04 ; 12
 
+                .const
                 ; Начальное меню (тебю;)
 TXTMainMenu:    DB      _ATTR,0Eh
                 DB      _XY,35,18,'PLAY THE GAME'       ; # 0
@@ -362,14 +364,14 @@ AlmazesCount    RD      1               ; Кол-во драгоценносте
 GameMode        RD      1               ; Код режима игры
 MenuNo          RD      1               ; Текущий пункт меню
 Level           RD      1               ; Номер текущего лабиринта
+Lives           RD      1
+SoundsCount     RD      1
+Score           RD      1               ; Очки
 
 KOD             RD      1               ; Код нажатой клавиши
 PRT             RB      1
-Popitk          RB      1
-OBK             RD      1               ; Очки
 PSK             RB      1
 ScrollArea      RB      16*12*2
-SoundsCount     RD      1
 HeroDie         RB      1               ; Флаг дохлого человечка
 Maze            RB      16*12           ; Тут наш лабиринт
                 RB      16              ; Кирпичи, чтобы камни не проваливались
@@ -386,12 +388,12 @@ record          Record
 ; count - сколько циклов игры нажата клавиша key
 ; key - код нажатой клавиши:
 ;   0 - ничего не нажимали
-;   1 - VK_LEFT
-;   2 - VK_RIGHT
-;   3 - VK_UP
-;   4 - VK_DOWN
-;   5 - VK_ESCAPE (покинуть уровень)
-;   6 - VK_DELETE (самоуничтожение)
+;   1 - KBD_MOVE_UP 
+;   2 - KBD_MOVE_DOWN 
+;   3 - KBD_MOVE_LEFT
+;   4 - KBD_MOVE_RIGHT
+;   5 - KBD_ESCAPE (покинуть уровень)
+;   6 - KBD_DESTRUCT (самоуничтожение)
 ;   7 - код не используется
 RecPtr          RD      1               ; Текущий адрес записи/воспроизведения
 RecSize         RD      1               ; Длина записи
@@ -415,11 +417,13 @@ proc            UpdateScreen
                 ; и если символ неравен, то рисуем его в картинке scr.vmem
                 ;
                 push    ebp
-                mov     edx, 0
+                xor     edx, edx
  .L1:           mov     ax, [scr.screen+edx*2]
                 cmp     ax, [scr.cachescreen+edx*2]
                 je      .L2
                 mov     [scr.cachescreen+edx*2], ax
+                ; РИСУЕМ символ AL
+                ; с атрибутами AH
                 movzx   esi, al
                 mov     esi, [scr.translCH+esi*4]       ; esi=адрес битовой карты символа
                 mov     edi, [scr.translADDR+edx*4]     ; edi=адрес символа в scr.vmem
@@ -432,7 +436,7 @@ proc            UpdateScreen
                 mov     ecx, [scr.palitre + ecx*4]      ; ecx=цвет символа
                 ;
                 mov     ah, CHAR_HEIGHT
- .L3:           mov     al, [esi]
+ .L3:           mov     al, [esi]                       ; Загрузка битовой маски
                 ;
             repeat 8
                 test    al, 1 SHL (8-%)
@@ -484,8 +488,11 @@ proc            MainWindowProc  hwnd, uMsg, wParam, lParam
                 be      eax, WM_KEYDOWN, .keydown
                 be      eax, WM_KEYUP, .keyup
                 be      eax, WM_TIMER, .timer
+                be      eax, WM_CLOSE, .close
                 invoke  DefWindowProc, [hwnd], [uMsg], [wParam], [lParam]       ; default window proc
                 ret
+                ;
+ .close:        invoke  ExitProcess, 0
                 ;
  .keydown:      movzx   eax, word [wParam]
                 mov     [ScanKeyboardMap+eax], TRUE
@@ -592,6 +599,7 @@ endp
 ;==============================================================================;
                 .code
 proc            start
+                mov     eax, DEMO_FROM_BEGIN
                 stdcall crc32InitTable
                 stdcall LoadMainFiles           ; В этой процедуре можем выйти
                 ;
@@ -629,13 +637,6 @@ MenuLoop:       mov     eax,[MenuNo]
                              VK_END,    .MenuEnd
                 jmp     MenuLoop
                 ;
- .MenuSelect:   mov     eax,[MenuNo]
-                switch  eax,0, .MenuGame, \
-                            1, .MenuEdit, \
-                            2, .MenuDemo, \
-                            3, .MenuQuit
-                jmp     MenuLoop
-                ;
  .MenuHome:     mov     [MenuNo], 0
                 jmp     MenuLoop
                 ;
@@ -648,6 +649,13 @@ MenuLoop:       mov     eax,[MenuNo]
  .MenuDown:     inc     [MenuNo]
                 jmp     MenuLoop
                 ;
+ .MenuSelect:   mov     eax,[MenuNo]
+                switch  eax,0, .MenuGame, \
+                            1, .MenuEdit, \
+                            2, .MenuDemo, \
+                            3, .MenuQuit
+                jmp     MenuLoop
+                ;
  .MenuEdit:     stdcall SelectLevelForEditing
                 mov     [GameMode],MODE_MENU
                 mov     esi,Maze
@@ -655,7 +663,7 @@ MenuLoop:       mov     eax,[MenuNo]
                 call    SlideUp
                 jmp     MenuSelect
                 ;
- .MenuGame:     ;;;call    GAME
+ .MenuGame:     call    GAME
                 jmp     MenuSelect
                 ;
  .MenuDemo:     call    DEMO_FROM_BEGIN
@@ -698,7 +706,7 @@ proc            LoadMainFiles
                 ;
  .Load:         stdcall LoadFile, ResourceFile, _Resource, RESOURCE_AREA_SIZE
                 jc      .ERRORLoad
-                ;;;call    CalculateResourceCRC
+                ;;;call    CalculateResourceCRC - раскомментировать, если нужно пересчитать контр.суммы
                 stdcall CheckResourceCRC
                 jc      .ERRORCrc
                 ret
@@ -737,12 +745,12 @@ proc            SaveMainFiles
 
                 mov     eax, [resaddr]
                 stdcall SaveFile, ResourceFile, eax, [eax+ResourceMainHeader.size]
-                jnc     .ok
-                mov     eax, -1                         ; Сигнализируем об ошибке
+                jc      .fail
+                mov     [reschanged], FALSE             ; Ресурс записан, и не менялся более
+ .ok:           xor     eax, eax                        ; Всё в порядке
                 ret
 
- .ok:           mov     [reschanged], FALSE             ; Ресурс записан, и не менялся более
-                xor     eax, eax                        ; Всё в порядке
+ .fail:         mov     eax, -1                         ; Сигнализируем об ошибке
                 ret
 endp
 
@@ -779,73 +787,6 @@ proc            GrabKeyCode uses esi
                 ret                
 endp
 
-;;GrabKeyCode:    push    si cx
-;;                mov     si,.keys
-;;                mov     cx,.size
-;;                call    CheckPressed
-;;                pop     cx si
-;;                ret
-;; .keys:         DB      VK_LEFT,VK_RIGHT,VK_UP,VK_DOWN,VK_ESC,VK_DEL
-;; .size          =       $- .keys
-;;
-;;                
-;;CheckPressed:   push    bx
-;; .L1:           lodsb
-;;                mov     bl,al
-;;                mov     bh,0
-;;                be      [ScanMap+bx],TRUE,.Pressed
-;;                loop    .L1
-;;                mov     ax,0
-;;                pop     bx
-;;                ret
-;; .Pressed:      mov     ah,al
-;;                mov     al,0
-;;                pop     bx
-;;                ret
-
-;                ; ECX=количество циклов задержки
-;                ; в DOS, опираемся на изменение счётчика по адресу 0040:006C, который 
-;                ; увеличивается на 1 каждые 18,2 раза в секунду, т.е. каждые 1000/18,2=54,95 мс
-;                ; Округлим это значение до 55.
-;proc            MakeDelay
-;                pushad
-;                stdcall ProcessMessages, PM_EXIT_BY_TIMER, ecx
-;                popad
-;                ret
-;              
-;                if      DEMOFAST = TRUE
-;                 bne     [GameMode],MODE_DEMO,.L0
-;                 push   dx
-;                 mov    dx,20
-; .L2:            push   cx
-;                 mov    cx,0FFFFh
-;                 loopd  $
-;                 pop    cx
-;                 dec    dx
-;                 jnz    .L2
-;                 pop    dx
-;                 ret
-;                end if
-; .L0:           push    es eax bx
-;                mov     ax,040h
-;                mov     es,ax
-;                mov     eax,[es:6Ch]
-; .L1:           call    ClearKbd
-;                cmp     eax,[es:6Ch]
-;                je      .L1
-;                pop     bx eax es
-;                loop    MakeDelay
-;                ret
-;endp
-
-;;ClearKbd:       push    es ax
-;;                mov     ax,40h
-;;                mov     es,ax
-;;                mov     ax,[es:1Ah]
-;;                mov     [es:1Ch],ax
-;;                pop     ax es
-;;                ret
-
 proc            BeepBolder
                 pushad
 ;;                pushad
@@ -874,18 +815,6 @@ proc            BeepBolder
                 ret
 endp
 
-;;
-;;WaitVSync:      push    dx ax
-;;                mov     dx,3DAh
-;; .L1:           in      al,dx
-;;                test    al,8
-;;                jnz     .L1
-;; .L2:           in      al,dx
-;;                test    al,8
-;;                jz      .L1
-;;                pop     ax dx
-;;                ret
-;;
                 ; Подготовить шрифт
 proc            PrepareFont
                 assert  sizeof.Scr.fontdata2 = 256*14
@@ -918,37 +847,11 @@ proc            SetVideoModes
                 ret
 endp
 
-;;SetVideoModes:  ; SETUP 80x28 CELLS MODE
-;;                mov     ax,1202h        ; set up 400 scan lines
-;;                mov     bl,30h
-;;                int     10h
-;;                mov     ax,0003h        ; set up normal text mode
-;;                int     10h
-;;                mov     ax,1111h        ; load ega character set
-;;                mov     bl,00h
-;;                int     10h
-;;                ;
-;;                call    PrepareFont
-;;                mov     ax,1110h        ; ah=11h      EGA character generator functions
-;;                                        ; al=10h      load user-defined text-mode display font
-;;                mov     bh,14           ; bh=14       количество байт на один символ (8 или 14)
-;;                mov     bl,0            ; bl=0        номер блока символов (от 0 до 4)
-;;                mov     cx,128          ; cx=128      количество программируемых символов
-;;                mov     dx,128          ; dx=128      код начального символа
-;;                mov     bp,fontdata2    ; bp          адрес битовой маски символов
-;;                int     10h
-;;                mov     ah,1
-;;                mov     cx,2020h
-;;                int     10h
-;;                ; Для стабилизации изображения на некоторых мониторах...
-;;                ; Philips 105MB, например...
-;;                mov     cx,25
-;;                call    MakeDelay
-;;                ret
-;;
-
-                ;
-                ; DH=y, DL=x, AH=attr, AL=char_code
+                ; Вывести символ на экран
+                ; IN    dh = координата y
+                ;       dl = координата x
+                ;       ah = атрибуты символа
+                ;       al = выводимый символ
                 ;
 proc            DrawCharBolder uses edx esi
                 movzx   esi, dh                 ; addr = DH * 160 + DL * 2
@@ -956,16 +859,20 @@ proc            DrawCharBolder uses edx esi
                 movzx   edx, dl
                 lea     esi, [esi + edx*2]
                 mov     [scr.screen + esi], ax
-;                pushad
-;                invoke  InvalidateRect, [MainWindow], NULL, FALSE
-;                call    UpdateScreen
-;                popad
+;;ДЛЯ ТЕСТОВЫХ ЦЕЛЕЙ
+;;                pushad
+;;                invoke  InvalidateRect, [MainWindow], NULL, FALSE
+;;                call    UpdateScreen
+;;                popad
                 ret
 endp
 
-macro           CHG_COORD       reg, mem
-{
-                local   .done, .setmem
+                ; Загрузка значения координаты в регистр AL
+                ; Если координата = _XY_IGN, игнорировать координату (не загружать в AL)
+                ; Если координата = _XY_MEM, загрузить значение из ячейки памяти mem
+                ; Любое другое значение - это значение координаты (константа)
+macro           LOAD_COORD  reg, mem
+{               local   .done, .setmem
                 be      al, _XY_IGN, .done
                 be      al, _XY_MEM, .setmem
                 mov     reg, al
@@ -985,12 +892,10 @@ proc            DrawTextBolder uses   eax edx esi
                 inc     dl
                 jmp     .Loop
                 ;
- .xy:           mov     al,[esi]        ; read X
-                inc     esi
-                CHG_COORD  dl, [MenuMemX]
-                mov     al,[esi]        ; read Y
-                inc     esi
-                CHG_COORD  dh, [MenuMemY]
+ .xy:           lodsb                   ; read X
+                LOAD_COORD  dl, [MenuMemX]
+                lodsb                   ; read Y
+                LOAD_COORD  dh, [MenuMemY]
                 jmp     .Loop
                 ;
  .attr:         mov     ah,[esi]
@@ -1009,8 +914,7 @@ proc            DrawTextBolder uses   eax edx esi
 endp
 
 macro           COPYDG  froma, toa, number
-{
-                local   .L1
+{               local   .L1
                 mov     esi, froma
                 mov     edi, toa
                 mov     ecx, number
@@ -1026,28 +930,86 @@ macro           COPYDG  froma, toa, number
 proc            LEV_INFO
                 mov     edx,[Level]
                 inc     edx
-                call    RAS
+                call    IntegerToString
                 COPYDG  ED+ED.size-3, _levno, 3
                 mov     esi,LEVTXT
                 call    DrawTextBolder
                 ret
 endp
 
+                ; show "SCORE: xxxxx" information
 proc            SCO_INFO
-                mov     edx,[OBK]
-                call    RAS
+                mov     edx,[Score]
+                call    IntegerToString
                 COPYDG  ED+ED.size-5, _scores, 5
                 mov     esi,SCOTXT
                 call    DrawTextBolder
                 ret
 endp
 
+                ; show "LIVES: xx" information
 proc            POP_INFO
-                movzx   edx,[Popitk]
-                call    RAS
+                mov     edx,[Lives]
+                call    IntegerToString
                 COPYDG  ED+ED.size-2, _lives, 2
                 mov     esi,POPTXT
                 call    DrawTextBolder
+                ret
+endp
+
+                ; Очки и попытки на информационную панель
+proc            PrepareGameScoreScreen
+                ; ПОПЫТКИ
+                mov     edx,[Lives]
+                call    IntegerToString
+                mov     esi,ED+ED.size-2
+                mov     edi,GameScore+89
+                mov     ecx,2
+                call    StringToGameScoreScreen
+                ; ОЧКИ
+                mov     edx,[Score]
+                call    IntegerToString
+                mov     esi,ED+ED.size-5
+                mov     edi,GameScore+121
+                mov     ecx,5
+                call    StringToGameScoreScreen
+                ret
+endp
+
+proc            StringToGameScoreScreen
+ .L1:           mov     al,[esi]
+                add     al,60
+                mov     [edi],al
+                add     al,10
+                mov     [edi-16],al
+                inc     esi
+                inc     edi
+                loop    .L1
+                ret
+endp
+
+                .udata
+ED              RB      12              ; Для форматирования чисел
+ .size          =       $-ED            ; Размер: чтобы гарантированно вместился Int32
+
+                .code
+                ; Преобразование числа из двоичного 
+                ; представления (EDX) в строковое (ED[12])
+proc            IntegerToString uses eax ebx edx edi
+                xor     eax, eax
+                mov     edi, ED+ED.size-1
+                mov     [edi-3], eax
+                mov     [edi-3-4], eax
+                mov     [edi-3-4*2], eax
+                ;
+                mov     eax, edx
+                mov     ebx, 10
+ .L1:           xor     edx, edx
+                div     ebx
+                mov     [edi], dl
+                dec     edi
+                or      eax, eax
+                jnz     .L1
                 ret
 endp
 
@@ -1166,7 +1128,7 @@ proc            CompressLevel
                 ;
                 mov     ecx, eax                ; Сохраняем сжатый уровень в ресурсах
                 mov     esi, tmp_level_data     ; ecx = размер сжатый данных (получено от BitsFlush)
-                GET_LEVEL_INDEX                 
+                GET_LEVEL_INDEX
                 call    ReplaceResource         ; Сохранить в ресурсах новый уровень
                 ;
                 xor     esi, esi
@@ -1262,63 +1224,70 @@ proc            CalculateLevel
                 ret
 endp
 
-;;;=== GAME CYCLE ===============================================================
-;;GAME:           mov     [Level],0               ; Номер уровня
-;;                mov     [Popitk],INIT_LIVES     ; Попыток
-;;                mov     [OBK],INIT_SCORE        ; Очки
-;;                call    NUMW
-;;                mov     si,GameTitle
-;;                mov     di,GameScore
-;;                call    SlideUpAndBeep          ; Заставка => Очки
-;;                mov     [GameMode],MODE_PLAY
-;; .PlayLevel:    mov     cx,15                   ; Пауза
-;;                call    MakeDelay
-;;                mov     si,GameScore
-;;                mov     di,MAZE_SCREEN
-;;                call    SlideUpAndBeep          ; Очки ==> Лабиринт
-;;                call    PlayLoop
-;;                be      ax,GAME_LEVEL_DONE,.L1
-;;                be      ax,GAME_LEVEL_BREAK,.L2
-;;                be      ax,GAME_PLAYER_DIE,.L2
-;;                be      ax,GAME_PLAY_BREAK,.L3
-;; .L2:           call    WaitForSilent
-;;                dec     [Popitk]
-;;                call    DrawStatusBar
-;;                call    NUMW
-;;                mov     si,Maze
-;;                mov     di,GameScore
-;;                call    SlideDownAndBeep
-;;                bne     [Popitk],0,.PlayLevel   ; Переход, если есть попытки
-;;                jmp     .GameOver
-;; .L1:           call    EndLevelSignal
-;;                inc     [Popitk]
-;;                inc     [Level]
-;;                add     [OBK],SCORE_BONUS
-;;                call    DrawStatusBar
-;;                call    NUMW
-;;                mov     si,Maze
-;;                mov     di,GameScore
-;;                call    SlideDownAndBeep
-;;                bne     [Level],MAX_LEVELS,.PlayLevel
-;; .GameOver:     call    BeepBolder              ; ИГРА ОКОНЧЕНА!!!
-;;                mov     [GameMode],MODE_MENU
-;;                jmp     .Title
-;; .L3:           mov     si,Maze
-;;                mov     di,GameScore
-;;                call    SlideDownAndBeep
-;;                call    ClearStatusBar
-;; .Title:        mov     cx,25                   ; Пауза
-;;                call    MakeDelay
-;;                mov     si,GameScore
-;;                mov     di,GameTitle
-;;                call    SlideDownAndBeep
-;; .Done:         ret
-;;;==============================================================================
-;;
+;=== GAME CYCLE ===============================================================
+proc            GAME
+                mov     [Level],0               ; Номер уровня
+                mov     [Lives],INIT_LIVES      ; Попыток
+                mov     [Score],INIT_SCORE        ; Очки
+                call    PrepareGameScoreScreen
+                mov     esi,GameTitle
+                mov     edi,GameScore
+                call    SlideUpAndBeep          ; Заставка => Очки
+                mov     [GameMode],MODE_PLAY
+ .PlayLevel:    stdcall ProcessMessages, PM_EXIT_BY_TIMER, 15; Пауза на экране с очками и попытками
+                mov     esi,GameScore
+                mov     edi,MAZE_SCREEN
+                call    SlideUpAndBeep          ; Очки ==> Лабиринт
+                call    PlayLoop
+                switch  eax, GAME_LVL_DONE,   .L1, \
+                             GAME_LVL_RESTART,.L2, \
+                             GAME_HERO_DIE,   .L2, \
+                             GAME_PLAY_END,   .L3
+                
+                ; РЕСТАРТ УРОВНЯ ИЛИ ГЕРОЙ ПОГИБ
+ .L2:           call    WaitForSilent
+                dec     [Lives]
+                call    DrawStatusBar
+                call    PrepareGameScoreScreen
+                mov     esi,Maze
+                mov     edi,GameScore
+                call    SlideDownAndBeep
+                bne     [Lives],0,.PlayLevel   ; Переход, если есть попытки
+                jmp     .GameOver
+                
+                ; УРОВЕНЬ ПРОЙДЕН
+ .L1:           call    EndLevelSignal
+                inc     [Lives]
+                inc     [Level]
+                add     [Score],SCORE_BONUS
+                call    DrawStatusBar
+                call    PrepareGameScoreScreen
+                mov     esi,Maze
+                mov     edi,GameScore
+                call    SlideDownAndBeep
+                bne     [Level],MAX_LEVELS,.PlayLevel
+
+ .GameOver:     call    BeepBolder              ; ИГРА ОКОНЧЕНА!!!
+                mov     [GameMode],MODE_MENU
+                jmp     .Title
+
+                ; ВЫХОД ИЗ ИГРЫ В ГЛАВНОЕ МЕНЮ
+ .L3:           mov     esi,Maze
+                mov     edi,GameScore
+                call    SlideDownAndBeep
+                call    ClearStatusBar
+ .Title:        stdcall ProcessMessages, PM_EXIT_BY_TIMER, 25; Пауза
+                mov     esi,GameScore
+                mov     edi,GameTitle
+                call    SlideDownAndBeep
+ .Done:         ret
+endp
+;==============================================================================
+
 ;;;=== TEST CYCLES ==============================================================
-;;TEST1:          mov     [Popitk],0
-;;                mov     [OBK],0
-;;                call    NUMW                    ; Очки никогда не показываются...
+;;TEST1:          mov     [Lives],0
+;;                mov     [Score],0
+;;                call    PrepareGameScoreScreen                    ; Очки никогда не показываются...
 ;; .TestLoop:     call    ExpandLevel
 ;;                mov     [GameMode],MODE_TEST
 ;;                call    PlayLoop
@@ -1352,10 +1321,10 @@ proc            DEMO
                 mov     edi,MAZE_SCREEN
                 call    SlideUpAndBeep          ; Черный экран -> Лабиринт
                 call    PlayLoop                ; >ИГРОВОЙ ЦИКЛ<
-                switch  eax, GAME_LEVEL_DONE,  .HideLevel, \
-                             GAME_PLAY_BREAK,  .DemoEnd,   \
+                switch  eax, GAME_LVL_DONE,    .HideLevel, \
+                             GAME_PLAY_END,    .DemoEnd,   \
                              GAME_HERO_DIE,    .DemoEnd,   \
-                             GAME_LEVEL_BREAK, .DemoEnd
+                             GAME_LVL_RESTART, .DemoEnd
  .HideLevel:    mov     esi,Maze
                 mov     edi,BLACK_SCREEN
                 call    SlideUp                 ; Лабиринт -> черный экран
@@ -1425,39 +1394,40 @@ proc            PlayLoop
                 ;
                 ; ВЫХОД ИЗ ИГРОВОГО ЦИКЛА С УКАЗАНИЕМ ПРИЧИНЫ
                 ;
- .LevelDone:    mov     eax,GAME_LEVEL_DONE             ; УРОВЕНЬ ПРОЙДЕН!!!
+ .LevelDone:    mov     eax,GAME_LVL_DONE               ; УРОВЕНЬ ПРОЙДЕН!!!
                 ret
- .PlayBreak:    mov     eax,GAME_PLAY_BREAK             ; ВЫХОД ИЗ ИГРЫ!!!
+ .PlayBreak:    mov     eax,GAME_PLAY_END               ; ВЫХОД ИЗ ИГРЫ!!!
                 ret
- .LevelBreak:   mov     eax,GAME_LEVEL_BREAK            ; ПЕРЕЗАПУСК УРОВНЯ!!!
+ .LevelBreak:   mov     eax,GAME_LVL_RESTART            ; ПЕРЕЗАПУСК УРОВНЯ!!!
                 ret
  .HeroDie:      mov     eax,GAME_HERO_DIE               ; ЧЕЛОВЕЧКА ПРИБИЛО!!!
                 ret                             
 endp
 ;==============================================================================
 
-;;
-;;                ; Ждем до тех пор, пока хоть что-то движется (кроме чудищ)
-;;WaitForSilent:  call    SKA
-;;                mov     cx,1
-;;                call    MakeDelay
-;;                bne     [PSK],0,WaitForSilent
-;;                ;
-;;                call    BeepBolder
-;;                stdcall DrawLevel, Maze
-;;                call    BeepBolder
-;;                ret
-;;
-;;                ; Писк после успешного прохождения уровня
-;;EndLevelSignal: mov     dx,3
-;; .L1:           call    BeepBolder
-;;                call    BeepBolder
-;;                mov     cx,5
-;;                call    MakeDelay
-;;                dec     dx
-;;                jnz     .L1
-;;                ret
-;;                
+
+                ; Ждем до тех пор, пока хоть что-то движется (кроме чудищ)
+proc            WaitForSilent
+ .Loop:         call    SKA1
+                stdcall ProcessMessages, PM_EXIT_BY_TIMER, GAME_DELAY
+                bne     [PSK], 0, .Loop
+                ;
+                call    BeepBolder
+                stdcall DrawLevel, Maze
+                call    BeepBolder
+                ret
+endp
+
+                ; Писк после успешного прохождения уровня
+proc            EndLevelSignal
+                mov     edx,3
+ .L1:           call    BeepBolder
+                call    BeepBolder
+                stdcall ProcessMessages, PM_EXIT_BY_TIMER, 5
+                dec     edx
+                jnz     .L1
+                ret
+endp
 
                 ; Редактирование лабиринта
 proc            EditLevel
@@ -1537,7 +1507,6 @@ proc            EditLevel
                 rep     stosd
                 jmp     .EditLoop
  .ENDSAVE:      call    CompressLevel
-;;ENDRLNO:        jmp     ViewNewLoop
  .ENDNOSAVE:    ret
 endp
 
@@ -1592,11 +1561,13 @@ SelectLoop:     stdcall ProcessMessages, PM_EXIT_BY_KEY, 0
  .End:          mov     eax, MAX_LEVELS-1
                 jmp     .Store
                 ;
+
 ;;VIEW_TEST:      call    TEST1
 ;;                mov     si,BLACK_SCREEN
 ;;                mov     di,MAZE_SCREEN
 ;;                call    SlideUp
 ;;                jmp     ViewNewLoop
+
 ;;VIEW_DEMO:      call    DEMO1
 ;;                mov     si,BLACK_SCREEN
 ;;                mov     di,MAZE_SCREEN
@@ -1604,58 +1575,6 @@ SelectLoop:     stdcall ProcessMessages, PM_EXIT_BY_KEY, 0
 ;;                jmp     ViewNewLoop
   .Done:        ret
 endp
-
-;;                ; Очки и попытки на информационную панель
-;;NUMW:           movzx   dx,[Popitk]
-;;                call    RAS
-;;                mov     si,ED+1
-;;                mov     di,GameScore+89
-;;                mov     cx,2
-;;                call    GLG
-;;                mov     dx,[OBK]
-;;                call    RAS
-;;                mov     si,ED+4
-;;                mov     di,GameScore+121
-;;                mov     cx,5
-;;                call    GLG
-;;                ret
-;;
-
-                .udata
-ED              RB      12              ; Для форматирования чисел
- .size          =       $-ED            ; Размер: чтобы гарантированно вместился Int32
-
-                .code
-                ; Преобразование числа из двоичного 
-                ; представления (EDX) в строковое (ED[12])
-proc            RAS uses eax ebx edx edi
-                xor     eax, eax
-                mov     edi, ED+ED.size-1
-                mov     [edi-3], eax
-                mov     [edi-3-4], eax
-                mov     [edi-3-4*2], eax
-                ;
-                mov     eax, edx
-                mov     ebx, 10
- .L1:           xor     edx, edx
-                div     ebx
-                mov     [edi], dl
-                dec     edi
-                or      eax, eax
-                jnz     .L1
-                ret
-endp
-
-;;
-;;GLG:            mov     al,[si]
-;;                add     al,60
-;;                mov     [di],al
-;;                add     al,10
-;;                mov     [di-16],al
-;;                dec     si
-;;                inc     di
-;;                loop    GLG
-;;                ret       
 
                 ; Произвести короткий звучек!!!
 proc            SOO
@@ -1704,6 +1623,8 @@ proc            RecorderPutKey uses ebx
                 je      .newcode
                 cmp     bh, 11111b                      ; Счётчик уже на последнем значении?
                 je      .counteroverflow
+                cmp     al, bl
+                jne     .counteroverflow
                 inc     bh
                 jmp     .L1
  .counteroverflow:
@@ -1717,8 +1638,7 @@ endp
 proc            RecorderStop
                 pushad
                 mov     ebx, [RecCode]
-                cmp     ebx, -1
-                jne     .L1
+                be      ebx, -1, .L1                    ; Переход, если ничего не было записано
                 call    Recorder_Helper_Write
  .L1:           mov     esi, RecArray
                 mov     ecx, [RecSize]
@@ -1817,9 +1737,7 @@ proc            SlideUp
                 call    MoveOrFill
                 mov     esi,ScrollArea
                 mov     ecx,13
- .L5:           ;push    esi ecx
-                stdcall DrawLevel, esi
-                ;pop     ecx esi
+ .L5:           stdcall DrawLevel, esi
                 add     esi,16
                 stdcall ProcessMessages, PM_EXIT_BY_TIMER, SLIDE_DELAY
                 loop    .L5
@@ -1827,12 +1745,11 @@ proc            SlideUp
                 ret
 endp
 
-;;
-;;SlideDownAndBeep:
-;;                call    SlideDown
-;;                call    BeepBolder
-;;                ret
-;;
+proc            SlideDownAndBeep
+                call    SlideDown
+                call    BeepBolder
+                ret
+endp
 
                 ;
                 ; Прокрутка экрана (конечный экран -> начальный экран)
@@ -1850,9 +1767,7 @@ proc            SlideDown
                 call    MoveOrFill
                 mov     esi,ScrollArea+16*12
                 mov     ecx,13
- .L1:           ;push    esi ecx
-                stdcall DrawLevel, esi
-                ;pop     ecx esi
+ .L1:           stdcall DrawLevel, esi
                 sub     esi,16
                 stdcall ProcessMessages, PM_EXIT_BY_TIMER, SLIDE_DELAY
                 loop    .L1

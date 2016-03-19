@@ -294,7 +294,7 @@ proc            SKA1
 
  .ZWK:          inc     [SoundsCount];call    SOO
                 dec     [AlmazesCount]
-                add     [OBK],SCORE_TREASURE
+                add     [Score],SCORE_TREASURE
  .UED:          pop     ebx
                 pop     esi
                 ret
