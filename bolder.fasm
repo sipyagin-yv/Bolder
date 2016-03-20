@@ -82,7 +82,9 @@ KBD_DESTRUCT    =       6
                 ; Команды для вывода текстов
 _XY             =       -1              ; Перемещение курсора ( _XY, <x>|_MEM|_IGN, <y>|_MEM|_IGN )
 _ATTR           =       -2              ; Установка атрибут текста ( _ATTR, <attr> )
-_SUBSTR         =       -3              ; Показать подстроку ( _SUBS, <index> )
+_ATTR2          =       -3              ; Выделение с помощью символа '~'
+_ATTR3          =       -4              ; Выделение с помощью символа '@'
+_SUBSTR         =       -5              ; Показать подстроку ( _SUBS, <index> )
 _END            =       0               ; Конец текста ( _END )
 _XY_MEM         =       -4              ; Для команды _XY, извлечь координату из ячейки памяти
 _XY_IGN         =       -5              ; Для команды _XY, не изменять соответствующую координату
@@ -325,12 +327,56 @@ GameScore:      DB      04,04,04,04,04,04,04,04,04,04,04,04,04,04,04,04 ; 1
                 DB      04,04,04,04,04,04,04,04,04,04,04,04,04,04,04,04 ; 12
 
                 .const
+GameHelp:       DB      00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00 ; 1
+                DB      00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00 ; 2
+                DB      00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00 ; 3
+                DB      00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00 ; 4
+                DB      00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00 ; 6
+                DB      00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00 ; 7
+                DB      00,00,01,00,02,00,03,00,04,00,05,00,06,00,07,00 ; 5
+                DB      00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00 ; 8
+                DB      00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00 ; 9
+                DB      00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00 ; 10
+                DB      00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00 ; 11
+                DB      00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00 ; 12
+
+HelpText:       DB      _ATTR,0Fh,_ATTR2,0A0h,_ATTR3,0Eh
+                DB      _XY,34,03,'INSTRUCTIONS'
+                DB      _ATTR,07h
+;                DB      _XY,7,25,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31
+;                DB      _XY,7,26,'1234567890123456789012345678901234567890',11,14,15,29
+                ;
+                DB      _ATTR,0Eh,_XY,10,04,'1. MENU',_ATTR,07h
+                DB      _XY,13,05,'Use ~',11,'~,~',15,'~,~HOME~,~END~ to select menu item, ~ENTER~ to use'
+                DB      _XY,13,06,'selected menu item. Press @ESC@ to exit from game.'
+                ;
+                DB      _ATTR,0Eh,_XY,10,08,'2. LEVEL DESIGN',_ATTR,07h
+                DB      _XY,13,09,'A) In SELECT MODE use ~',29,'~,~',14,'~,~HOME~,~END~ to select level,'
+                DB      _XY,13,10,'   ~ENTER~ to EDIT MODE, ~ESC~ to exit, @D@ to demo, @T@ for test'
+                DB      _XY,13,11,'B) In EDIT MODE, use ~',11,'~,~',15,'~,~',29,'~,~',14,'~,~HOME~,~END~,~PGUP~,~PGDN~ to'
+                DB      _XY,13,12,'   cursor movement, and @0@ to @7@ to put game elements.'
+                DB      _XY,13,13,'   Use ~ENTER~ to save level or ~ESC~ to discard changes and'
+                DB      _XY,13,14,'   return to SELECT MODE. Table of game elements:'
+;                DB      _XY,09,15,'@0@',_XY,15,15,'@1@',_XY,23,15,'@2@',_XY,31,15,'@3@'
+;                DB      _XY,39,15,'@4@',_XY,47,15,'@5@',_XY,55,15,'@6@',_XY,63,15,'@7@'
+                DB      _XY,08,17,'@0@empty @1@rock  @2@almaz   @3@earth  @4@wall   @5@hero @6@monster @7@concrete'
+                ;
+                DB      _ATTR,0Eh,_XY,10,19,'3. GAME',_ATTR,07h
+                DB      _XY,13,20,'Use ~',11,'~,~',15,'~,~',29,'~,~',14,'~ to movement hero. You goal is collect'
+                DB      _XY,13,21,'all almaz but avoid the monster. You can push rock left,'
+                DB      _XY,13,22,'right and up. Falling rock and almaz explodes after'
+                DB      _XY,13,23,'contact with hero and monsters (push rock to monster'
+                DB      _XY,13,24,'to destroy it). Use @P@ to pause, @DELETE@ to self'
+                DB      _XY,13,25,'destruction, @ESC@ to break game.'
+                DB      _END
                 ; Начальное меню (тебю;)
 TXTMainMenu:    DB      _ATTR,0Eh
                 DB      _XY,35,18,'PLAY THE GAME'       ; # 0
                 DB      _XY,35,20,'LEVEL DESIGN'        ; # 1
                 DB      _XY,35,22,'DEMO (WHOLE GAME)'   ; # 2
-                DB      _XY,35,24,'EXIT',_END           ; # 3
+                DB      _XY,35,24,'EXIT'                ; # 3
+                DB      _ATTR,0Fh,_XY,65,26, 'F1-HELP'
+                DB      _END
                 ;
 TXTMenuSelector:DB      _ATTR,00h
                 DB      _XY,31,18,'   '                 ; # 0
@@ -599,7 +645,6 @@ endp
 ;==============================================================================;
                 .code
 proc            start
-                mov     eax, DEMO_FROM_BEGIN
                 stdcall crc32InitTable
                 stdcall LoadMainFiles           ; В этой процедуре можем выйти
                 ;
@@ -634,7 +679,8 @@ MenuLoop:       mov     eax,[MenuNo]
                              VK_ESCAPE, .MenuQuit,   \
                              VK_RETURN, .MenuSelect, \
                              VK_HOME,   .MenuHome,   \
-                             VK_END,    .MenuEnd
+                             VK_END,    .MenuEnd,    \
+                             VK_F1,     .MenuHelp
                 jmp     MenuLoop
                 ;
  .MenuHome:     mov     [MenuNo], 0
@@ -648,6 +694,13 @@ MenuLoop:       mov     eax,[MenuNo]
                 ;
  .MenuDown:     inc     [MenuNo]
                 jmp     MenuLoop
+                ;
+ .MenuHelp:     stdcall DrawLevel, GameHelp
+                mov     esi, HelpText
+                call    DrawTextBolder
+
+                stdcall ProcessMessages, PM_EXIT_BY_KEY, 0
+                jmp     MainMenu
                 ;
  .MenuSelect:   mov     eax,[MenuNo]
                 switch  eax,0, .MenuGame, \
@@ -818,24 +871,56 @@ endp
                 ; Подготовить шрифт
 proc            PrepareFont
                 assert  sizeof.Scr.fontdata2 = 256*14
+                pushad
+                ; Сначала очищаем всю таблицу букв
+                mov     edi,scr.fontdata2
+                mov     ecx,256*14/4
+                xor     eax, eax
+                rep     stosd
+                ; Теперь копируем первые 128 символов, увеличивая их
                 mov     esi,fontdata
                 mov     edi,scr.fontdata2
                 mov     ecx,128
                 ; Шрифт увеличивается с 8 строк до 14 строк:
                 ; 01234567 -> 01122334455667
  .M1:           movsb
-                mov     dl,6
+                mov     edx, 6
  .M2:           lodsb
                 stosb
                 stosb
-                dec     dl
+                dec     edx
                 jnz     .M2
                 movsb
                 loop    .M1
-                ; Оставшиеся 128 символов заполнить нулями
-                mov     ecx, 128 * 14 / 4
-                xor     eax, eax
-                rep     stosd
+                ; А теперь переносим буквы 'A'..'Z' в область 'A'+128..'Z'+128, но
+                ; не увеличиваем до 14 строк, а оставляем 8 строк (чтобы была имитация строчных букв)
+                mov     esi,fontdata+'A'*8
+                mov     edi,scr.fontdata2+128*14
+                mov     edx,'Z'-'A'+1
+ .Loop2:        xor     eax, eax                ; Заполняем нулями 14-8 = 6 байт
+                stosd
+                stosw
+                mov     ecx, 8                  ; Оставшиеся 8 байт копируем
+                rep     movsb
+                dec     edx
+                jnz     .Loop2
+                ; Далее переносим буквы 'A'..'Z' в область 'A'+160..'Z'+160, увеличивая лишь немного
+                mov     esi,fontdata+'A'*8
+                mov     edi,scr.fontdata2+160*14
+                mov     edx,'Z'-'A'+1
+ .Loop3:        mov     al, 0
+                stosb
+                movsb
+               repeat 5
+                lodsb
+                stosb
+                stosb
+               end repeat
+                movsb
+                movsb
+                dec     edx
+                jnz     .Loop3
+                popad
                 ret
 endp
 
@@ -854,7 +939,20 @@ endp
                 ;       al = выводимый символ
                 ;
 proc            DrawCharBolder uses edx esi
-                movzx   esi, dh                 ; addr = DH * 160 + DL * 2
+                ; Особая обработка для строчных букв
+                cmp     al, 'a'
+                jb      .L1
+                cmp     al, 'z'
+                ja      .L1
+                sub     al,'a'
+                add     al,128
+ .L1:           cmp     al,'A'
+                jb      .L2
+                cmp     al,'Z'
+                ja      .L2
+                sub     al,'A'
+                add     al,160
+ .L2:           movzx   esi, dh                 ; addr = DH * 160 + DL * 2
                 imul    esi, 160
                 movzx   edx, dl
                 lea     esi, [esi + edx*2]
@@ -881,13 +979,20 @@ macro           LOAD_COORD  reg, mem
  .done:
 }
 
-proc            DrawTextBolder uses   eax edx esi
+proc            DrawTextBolder uses   eax edx esi ecx
+                mov     ah, 07h;attr
+                mov     ch, 07h;attr2
+                mov     cl, 07h;attr3
                 push    dword -1
  .Loop:         lodsb
-                switch  al, _END, .endtxt, \
-                            _XY, .xy,      \
-                            _ATTR, .attr,  \
-                            _SUBSTR, .subs
+                switch  al, _END, .endtxt,  \
+                            _XY, .xy,       \
+                            _ATTR, .attr,   \
+                            _ATTR2, .attr2, \
+                            _ATTR3, .attr3, \
+                            _SUBSTR, .subs, \
+                            '~', .attr2xchg,\
+                            '@', .attr3xchg
                 call    DrawCharBolder
                 inc     dl
                 jmp     .Loop
@@ -900,6 +1005,16 @@ proc            DrawTextBolder uses   eax edx esi
                 ;
  .attr:         mov     ah,[esi]
                 inc     esi
+                jmp     .Loop
+ .attr2:        mov     ch,[esi]
+                inc     esi
+                jmp     .Loop
+ .attr3:        mov     cl,[esi]
+                inc     esi
+                jmp     .Loop
+ .attr2xchg:    xchg    ah,ch
+                jmp     .Loop
+ .attr3xchg:    xchg    ah,cl
                 jmp     .Loop
                 ;
  .subs:         inc     esi
