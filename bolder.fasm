@@ -11,8 +11,8 @@
                 include "keys.inc"
                 include "bits.inc"
                 include "resource.inc"
-                include "ska1.inc"
-                ;include "ska2.inc"
+                include "ska1new.inc"
+                include "ac_bits.inc"
 
                 ; Win32-version specific constants
 CHAR_WIDTH      =       8               ; in pixels
@@ -138,7 +138,9 @@ LevLoadErrMsg   du      'Can''t load resource file "bolder.bin"', 0
 LevSaveErrMsg   du      'Failed to save resource file "bolder.bin"', 0
 
                 ; Оригинальные ресурсы (с которыми поставляется игра)
-ResourceOriginal file   'resources\bolder.original.bin'
+ResourceOriginal file   'resources\bolder.original.ac'
+ResourceCopyright DB    'Bolder 3.2 PC resource file. Maked with RESMAKER by YSoft lab.'
+ .size          =       $-ResourceCopyright
                 ; "Партнерский" шрифт
 fontdata        file    'fnt8x8.bin'
 
@@ -765,13 +767,30 @@ proc            LoadMainFiles
                 ret
 
  .ExtractOriginal:
-                ; Извлекаем из внутреннего архива оригинальные уровни (на момент компиляции игры)
-                mov     esi, ResourceOriginal
-                mov     edi, _Resource
-                mov     [resaddr], edi
-                mov     [reschanged], FALSE
-                mov     ecx, [esi + ResourceMainHeader.size]
-                rep     movsb                
+                mov     edi, _Resource                  ; Извлекаем из внутреннего архива оригинальные уровни
+                mov     eax, 1001                       ; (на момент компиляции игры)
+                call    InitResource
+                mov     eax, ResourceOriginal
+                call    AC_DecodeStart
+                xor     edx, edx                        ; Текущий уровень
+ .LoopMaze:     mov     edi, Maze
+                mov     ecx, MAZE_WIDTH * MAZE_HEIGHT
+                mov     bl, 3
+ .L1:           call    AC_DecodeBits
+                stosb
+                loop    .L1
+                stdcall CompressLevel_Helper, Maze, tmp_level_data
+                mov     ecx, eax
+                mov     esi, tmp_level_data
+                mov     edi, edx
+                call    ReplaceResource
+                inc     edx
+                cmp     edx, 200
+                jb      .LoopMaze
+                mov     edi, 1000                       ; Помещаем в конце ресурса подпись
+                mov     esi, ResourceCopyright
+                mov     ecx, ResourceCopyright.size
+                call    ReplaceResource
                 ret
 
  .ERRORExit:    invoke  ExitProcess, -1
@@ -1220,44 +1239,48 @@ proc            DrawFrameBolder
                 ret
 endp
 
-                ; Компрессия уровня
-proc            CompressLevel
-                ; Временно сохраняем уровень
-                MOVEBLK Maze, tmp_level_data, MAZE_WIDTH*MAZE_HEIGHT
-                ; Извлекаем уровень из архива
-                call    ExpandLevel
-                ; Сравниваем два уровня на одинаковость
-                CMPBLK  Maze, tmp_level_data, MAZE_WIDTH*MAZE_HEIGHT
-                je      .Done
-                ; Копируем уровень обратно в Maze
-                MOVEBLK tmp_level_data, Maze, MAZE_WIDTH*MAZE_HEIGHT
-                ; И "сжимаем" Maze -> tmp_level_data
-                stdcall BitsInit, tmp_level_data
-                mov     esi,Maze
+                ; Сжать уровень
+                ; IN    src - откуда брать данные
+                ;       dst - куда помещать сжатые данные
+                ; OUT   eax = размер сжатых данных
+proc            CompressLevel_Helper,  src:DWORD, dst:DWORD
+                pushad
+                stdcall BitsInit, [dst]                 ; init
+                mov     esi,[src]
                 mov     ecx, MAZE_WIDTH * MAZE_HEIGHT
                 xor     eax, eax
  .Loop:         lodsb
                 stdcall BitsPut, eax, 3
                 loop    .Loop
                 stdcall BitsFlush
+                mov     [esp + pushad_data.r_eax], eax
+                popad
+                ret
+endp
+
+                ; Компрессия уровня
+proc            CompressLevel
+                MOVEBLK Maze, tmp_level_data, MAZE_WIDTH*MAZE_HEIGHT    ; Временно сохраняем уровень
+                call    ExpandLevel                                     ; Извлекаем уровень из архива
+                CMPBLK  Maze, tmp_level_data, MAZE_WIDTH*MAZE_HEIGHT    ; Сравниваем два уровня на одинаковость
+                je      .Done                                           ; Выход, если уровень не изменялся
+                MOVEBLK tmp_level_data, Maze, MAZE_WIDTH*MAZE_HEIGHT    ; Копируем уровень обратно в Maze
+                stdcall CompressLevel_Helper, Maze, tmp_level_data      ; И "сжимаем" Maze -> tmp_level_data
                 ;
                 mov     ecx, eax                ; Сохраняем сжатый уровень в ресурсах
                 mov     esi, tmp_level_data     ; ecx = размер сжатый данных (получено от BitsFlush)
                 GET_LEVEL_INDEX
                 call    ReplaceResource         ; Сохранить в ресурсах новый уровень
-                ;
-                xor     esi, esi
+                xor     esi, esi                ; Удалить демо измененного уровня
                 xor     ecx, ecx
                 GET_DEMO_INDEX
-                call    ReplaceResource         ; Удалить демо
+                call    ReplaceResource
                 ;
  .save:         call    SaveMainFiles
-                ; В регистре eax = 0, запись успешна; eax = -1 нет
-                or      eax, eax
+                or      eax, eax                ; В регистре eax = 0, запись успешна; eax = -1 нет
                 jz      .Done
-                ; Обрабатываем ошибку
-                stdcall ShowError, LevSaveErrMsg, editorsave_question, MB_YESNO
-                switch  eax, IDYES, .save
+                stdcall ShowError, LevSaveErrMsg, editorsave_question, MB_YESNO ; Обрабатываем ошибку
+                switch  eax, IDYES, .save       ; Если выбрали "ЗАПИСАТЬ", пытаемся выполнить повторную запись
  .Done:         ret
 endp
 

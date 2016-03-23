@@ -30,12 +30,15 @@ reschanged      RB      1               ; Флаг измененного рес
                 ; In:  EDI=address of resource area
                 ;      EAX=count of resource entries
                 ;
-proc            InitResource uses esi edi eax ecx
+proc            InitResource
+                pushad
                 ; Инициализируем заголовок
+                push    eax
                 mov     esi, edi                        ; Для вычисления размера
                 mov     ecx, sizeof.ResourceMainHeader  ; Для начала очищаем все поля заголовка
                 xor     eax, eax
                 rep     stosb
+                pop     eax
                 mov     edi, esi
                 mov     [edi + ResourceMainHeader.magic], 'BLDR'
                 mov     [edi + ResourceMainHeader.count], eax
@@ -50,6 +53,7 @@ proc            InitResource uses esi edi eax ecx
                 mov     [resaddr], esi
                 mov     [reschanged], TRUE
                 call    CalculateResourceCRC
+                popad
                 ret                
 endp
 
