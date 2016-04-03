@@ -11,7 +11,8 @@
                 include "keys.inc"
                 include "bits.inc"
                 include "resource.inc"
-                include "ska1new.inc"
+                include "ska1.inc"
+                ;;;include "ska1new.inc"
                 include "ac_bits.inc"
 
                 ; Win32-version specific constants
@@ -653,7 +654,9 @@ proc            start
                 stdcall SetVideoModes
                 call    InstallKeyboard
                 call    DrawFrameBolder         ; Находится на экране постоянно
-                mov     [MenuNo],0
+                ;
+                xor     eax, eax
+                mov     [MenuNo],eax
                 ;=== НАЧАЛО - Main Menu ===
 MainMenu:       mov     [GameMode],MODE_MENU
                 mov     esi,BLACK_SCREEN
@@ -685,7 +688,8 @@ MenuLoop:       mov     eax,[MenuNo]
                              VK_F1,     .MenuHelp
                 jmp     MenuLoop
                 ;
- .MenuHome:     mov     [MenuNo], 0
+ .MenuHome:     xor     eax, eax
+                mov     [MenuNo], eax
                 jmp     MenuLoop
                 ;
  .MenuEnd:      mov     [MenuNo], 11b

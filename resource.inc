@@ -84,9 +84,11 @@ proc            GetResourcePtr uses edi
 endp
 
                 ; put array [ESI] of length ECX into resource number EDI
+                ;
                 ; IN    esi = array to write to resource
                 ;       ecx = length of array (in bytes)
                 ;       edi = index of resource (from 0)
+                ;
                 ; OUT   -
 proc            ReplaceResource
                 pushad
@@ -107,7 +109,7 @@ proc            ReplaceResource
                 ; Итак, двигаем [esi] -> [edi] by ecx bytes
                 ; Вычисляем, сколько байт нужно сдвинуть
                 ; ecx = ebx + (ecx - esi) 
-                ; => ecx = адрес_начала_ресурсов + размер_ресурса - адрес_перемещаемого_ресурса
+                ; => ecx = адрес_начала_ресурсов + размер_ресурса_всего - адрес_перемещаемого_ресурса
                 add     ecx, ebx
                 sub     ecx, esi
                 jz      .L1                                     ; Переход, если ничего не нужно двигать

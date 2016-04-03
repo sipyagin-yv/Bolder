@@ -20,49 +20,58 @@ proc            LoadFile        fileName:DWORD, fileBuffer:DWORD, fileBufferSize
                         0, NULL, OPEN_EXISTING, 0, 0
                 mov     [h], eax
                 cmp     eax, INVALID_HANDLE_VALUE
-                jne     .L1
-                SYSTEMERROR     ActionOpenFile
-                jmp     .fail
+                je      .createfile_fail
 
- .L1:           invoke  GetFileSizeEx, [h], addr fileSize       ; Определяем размер файла
+                invoke  GetFileSizeEx, [h], addr fileSize       ; Определяем размер файла
                 or      eax, eax
-                jnz     .L2
-                SYSTEMERROR     ActionGetFileSize
-                jmp     .fail
+                jz      .getfilesizeex_fail
 
- .L2:           mov     eax, [fileSize.high]                    ; Проверяем максимальный размер
+                mov     eax, [fileSize.high]                    ; Проверяем максимальный размер
                 or      eax, eax
-                jnz     .L3
+                jnz     .filesize_toobig
                 mov     eax, [fileSize.low]
                 cmp     eax, [fileBufferSize]
-                jbe     .L4
- .L3:           USERERROR       , ErrorResourceTooBig
-                jmp     .fail
+                ja      .filesize_toobig
 
- .L4:           invoke  ReadFile, [h], [fileBuffer], \          ; Читаем файл
+                invoke  ReadFile, [h], [fileBuffer], \          ; Читаем файл
                         [fileSize.low], addr fileReaded, NULL
                 or      eax, eax
-                jz      .L5
-                mov     eax, [fileReaded]
+                jz      .readfile_fail
+
+                mov     eax, [fileReaded]                       ; Проверяем, сколько прочитано
                 cmp     eax, [fileSize.low]
-                je      .L6
+                jne     .readfile_wrongread
 
-                USERERROR       , ErrorReadNotEqRequested
-                jmp     .fail
-
- .L5:           SYSTEMERROR     ActionReadFile
-                jmp     .fail
-
- .L6:           invoke  CloseHandle, [h]                        ; Закрываем файл
+                invoke  CloseHandle, [h]                        ; Закрываем файл
                 or      eax, eax
-                clc
-                jnz     .return
+                jz      .closehandle_fail
 
-                SYSTEMERROR     ActionCloseHandle
+                clc                                             ; Всё в порядке, выходим
+                popad
+                ret
 
  .fail:         stc
- .return:       popad
+                popad
                 ret
+
+ .createfile_fail:
+                SYSTEMERROR     ActionOpenFile
+                jmp     .fail
+ .getfilesizeex_fail:
+                SYSTEMERROR     ActionGetFileSize
+                jmp     .fail
+ .filesize_toobig:
+                USERERROR       , ErrorResourceTooBig
+                jmp     .fail
+ .readfile_fail:
+                SYSTEMERROR     ActionReadFile
+                jmp     .fail
+ .readfile_wrongread:
+                USERERROR       , ErrorReadNotEqRequested
+                jmp     .fail
+ .closehandle_fail:
+                SYSTEMERROR     ActionCloseHandle
+                jmp     .fail
 endp
 
 proc            SaveFile        fileName:DWORD, fileBuffer:DWORD, fileSize:DWORD
@@ -74,30 +83,39 @@ proc            SaveFile        fileName:DWORD, fileBuffer:DWORD, fileSize:DWORD
                         0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL
                 mov     [h], eax
                 or      eax, eax
-                jnz     .L1
-                SYSTEMERROR     ActionCreateFile
-                jmp     .fail
+                jz      .createfile_fail
 
- .L1:           invoke  WriteFile, [h], [fileBuffer], \                 ; Записываем в файл
+                invoke  WriteFile, [h], [fileBuffer], \                 ; Записываем в файл
                         [fileSize], addr fileWritten, NULL
                 or      eax, eax
-                jz      .L2
-                mov     eax, [fileWritten]
+                jz      .writefile_fail
+                
+                mov     eax, [fileWritten]                              ; Проверяем, сколько байт записалось
                 cmp     eax, [fileSize]
-                je      .L3
-                USERERROR       , ErrorWritedNotEqRequested
-                jmp     .fail
+                jne     .writefile_wrongsize
 
- .L2:           SYSTEMERROR     ActionWriteFile
-                jmp     .fail
-
- .L3:           invoke  CloseHandle, [h]                                ; Закрываем файл
+                invoke  CloseHandle, [h]                                ; Закрываем файл
                 or      eax, eax
+                jz      .closehandle_fail
+
                 clc
-                jnz     .return
-                SYSTEMERROR     ActionCloseHandle
+                popad
+                ret
 
  .fail:         stc
- .return:       popad
+                popad
                 ret
+
+ .createfile_fail:
+                SYSTEMERROR     ActionCreateFile
+                jmp     .fail
+ .closehandle_fail:
+                SYSTEMERROR     ActionCloseHandle
+                jmp     .fail
+ .writefile_fail:
+                SYSTEMERROR     ActionWriteFile
+                jmp     .fail
+ .writefile_wrongsize:
+                USERERROR       , ErrorWritedNotEqRequested
+                jmp     .fail
 endp
