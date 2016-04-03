@@ -40,8 +40,8 @@ proc            InitResource
                 rep     stosb
                 pop     eax
                 mov     edi, esi
-                mov     [edi + ResourceMainHeader.magic], 'BLDR'
-                mov     [edi + ResourceMainHeader.count], eax
+                mov     [edi + ResourceMainHeader.magic], 'BLDR'        ; Magic id
+                mov     [edi + ResourceMainHeader.count], eax           ; resource count (from 0 to eax-1)
                 ; Инициализируем блоки данных
                 add     edi, sizeof.ResourceMainHeader
  .L1:           mov     [edi + ResourceDataHeader.size], 0

@@ -1171,7 +1171,7 @@ proc            DrawStatusBar
                 rep     stosw
                 ;
                 mov     eax,[GameMode]          ; Показываем статусную строку 
-                be      eax,MODE_MENU,.Menu     ; в зависимости от текущего режима
+                be      eax,MODE_MENU,.MainMenu ; в зависимости от текущего режима
                 be      eax,MODE_PLAY,.Play
                 be      eax,MODE_VIEW,.View
                 be      eax,MODE_VIDA,.ViDa
@@ -1207,7 +1207,7 @@ proc            DrawStatusBar
                 call    DrawTextBolder
                 ret
                 ;
- .Menu:         mov     esi,COPYR_TXT
+ .MainMenu:     mov     esi,COPYR_TXT
                 call    DrawTextBolder
                 ret
 endp
@@ -1916,5 +1916,11 @@ proc            SlideDown
                 popad
                 ret
 endp
+
+;
+;Y:\Projects\Boulder MY (win32)\bolder.fasm [652]:
+;
+
+
 
                 END
