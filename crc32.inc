@@ -42,7 +42,3 @@ proc            crc32calc uses esi ebx ecx
                 not     eax
                 ret
 endp
-
-
-a1      db      100
-a2      du      "string"

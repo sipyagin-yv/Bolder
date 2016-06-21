@@ -2,13 +2,13 @@
 gr_mode=1
 gr_act=1
 split=50
-tab_act=13,0,0,0,0,0,
+tab_act=0,0,0,0,0,0,
 tabs=14
 [f0]
 gr=1
 fn=.\bolder.fasm
-top=1490,0
-caret=66729,0
+top=1142,0
+caret=52318,0
 wrap=0,0
 prop=0,1,1,1,
 color=clNone
@@ -17,8 +17,8 @@ folded=;
 [f1]
 gr=1
 fn=.\ac_bits.inc
-top=91,0
-caret=4467,0
+top=178,0
+caret=8141,0
 wrap=0,0
 prop=0,1,1,1,
 color=clNone
@@ -47,7 +47,7 @@ folded=;
 [f4]
 gr=1
 fn=.\errors.inc
-top=48,0
+top=110,0
 caret=6106,0
 wrap=0,0
 prop=0,1,1,1,
@@ -138,7 +138,7 @@ folded=;
 gr=1
 fn=.\LEXER_TEST.asm
 top=0,0
-caret=442,0
+caret=264,0
 wrap=0,0
 prop=0,1,1,1,
 color=clNone

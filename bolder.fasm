@@ -1917,10 +1917,4 @@ proc            SlideDown
                 ret
 endp
 
-;
-;Y:\Projects\Boulder MY (win32)\bolder.fasm [652]:
-;
-
-
-
                 END
